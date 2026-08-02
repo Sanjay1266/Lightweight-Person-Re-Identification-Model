@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Lightweight Person Re-Identification Model featuring Bag-Invariance, CBAM Attention, and Real-Time Top-K Identity Matching.">
+    <title>Lightweight Person Re-ID Dashboard | Bag-Invariant Computer Vision System</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+    <!-- Header & Glass Navigation -->
+    <header class="header-nav">
+        <div class="brand-container">
+            <div class="brand-logo" id="app_logo">ReID</div>
+            <h1 class="brand-title">Lightweight Person Re-ID System</h1>
+        </div>
+
+        <nav class="nav-tabs" id="main_nav_tabs">
+            <button class="nav-tab-btn active" data-tab="tab-search" id="tab_btn_search">Search & Query</button>
+            <button class="nav-tab-btn" data-tab="tab-metrics" id="tab_btn_metrics">Cross-Condition Metrics</button>
+        </nav>
+    </header>
+
+    <main class="main-container">
+
+        <!-- Hero Section -->
+        <section class="hero-section">
+            <h2 class="hero-title">Bag-Invariant Person Re-Identification</h2>
+            <p class="hero-subtitle">
+                Powered by a lightweight deep neural network with Convolutional Block Attention Module (CBAM) 
+                and Hard-Mining Triplet Loss. Re-identifies individuals across multi-camera surveillance networks 
+                even under accessory variation (carrying bag vs. without bag).
+            </p>
+        </section>
+
+        <!-- Tab 1: Search & Re-ID Query Tester -->
+        <div class="tab-pane active" id="tab-search">
+            <div class="grid-2col">
+                
+                <!-- Sidebar Controls -->
+                <aside class="glass-card">
+                    <h3 class="section-heading">
+                        <span>🔍</span> Query Controls
+                    </h3>
+
+                    <div class="form-group">
+                        <label class="form-label" for="dataset_type_select">Select Dataset Subset</label>
+                        <select class="form-select" id="dataset_type_select">
+                            <option value="both_small">both_small (Combined Subset)</option>
+                            <option value="with_bag">with_bag (Person with Bag)</option>
+                            <option value="without_bag">without_bag (Person without Bag)</option>
+                            <option value="both_large">both_large (Full Evaluation Dataset)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Upload Custom Image</label>
+                        <div class="upload-box" id="upload_box">
+                            <div class="upload-icon">📁</div>
+                            <div style="font-size: 0.85rem; color: #94a3b8;">Click to browse or drag image</div>
+                            <input type="file" id="custom_file_input" accept="image/*" style="display: none;">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Or Pick Sample Query Image</label>
+                        <div class="samples-grid" id="samples_grid">
+                            <!-- Dynamically loaded sample thumbnails -->
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="top_k_select">Top-K Gallery Matches</label>
+                        <select class="form-select" id="top_k_select">
+                            <option value="5">Top 5</option>
+                            <option value="10" selected>Top 10</option>
+                            <option value="15">Top 15</option>
+                            <option value="20">Top 20</option>
+                        </select>
+                    </div>
+
+                    <button class="btn-primary" id="run_reid_btn">Run Person Re-ID Search</button>
+                </aside>
+
+                <!-- Results & Attention Visualizer -->
+                <section class="glass-card">
+                    <h3 class="section-heading">
+                        <span>🎯</span> Retrieval Gallery & Feature Attention
+                    </h3>
+
+                    <div class="spinner-wrapper" id="results_spinner">
+                        <div class="spinner"></div>
+                        <div style="color: #94a3b8; font-weight: 500;">Extracting embeddings & ranking gallery identities...</div>
+                    </div>
+
+                    <div id="results_container" style="display: none;">
+                        <!-- Query & Attention Map Preview -->
+                        <div class="query-preview-wrapper">
+                            <div class="query-img-card">
+                                <div style="font-size: 0.8rem; font-weight: 600; color: #94a3b8; margin-bottom: 4px;">Query Input</div>
+                                <img id="query_preview_img" src="" alt="Query Person">
+                            </div>
+                            <div class="heatmap-img-card">
+                                <div style="font-size: 0.8rem; font-weight: 600; color: #94a3b8; margin-bottom: 4px;">CBAM Attention Map</div>
+                                <img id="heatmap_preview_img" src="" alt="Attention Overlay">
+                            </div>
+                            <div style="flex: 1; padding-left: 1rem; color: #cbd5e1; font-size: 0.9rem; line-height: 1.5;">
+                                <h4 style="color: #fff; font-size: 1.05rem; margin-bottom: 6px;">Feature Disentanglement Focus</h4>
+                                <p>The CBAM attention heatmap highlights the body features (torso, height, apparel pattern) that the network uses for identity matching, minimizing distraction from accessories like backpacks or handbags.</p>
+                            </div>
+                        </div>
+
+                        <!-- Gallery Matches Grid -->
+                        <h4 style="font-family: 'Outfit', sans-serif; font-size: 1.1rem; color: #fff; margin-bottom: 1rem;">Ranked Gallery Matches</h4>
+                        <div class="matches-grid" id="matches_grid">
+                            <!-- Dynamically populated matched gallery cards -->
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+        </div>
+
+        <!-- Tab 2: Cross-Condition Performance Metrics -->
+        <div class="tab-pane" id="tab-metrics">
+            <section class="glass-card">
+                <h3 class="section-heading">
+                    <span>📊</span> Cross-Condition Benchmark Evaluation
+                </h3>
+                <p style="color: #94a3b8; font-size: 0.95rem; margin-bottom: 1.5rem;">
+                    Quantitative evaluation results using Cumulative Matching Characteristics (Rank-1, Rank-5, Rank-10) 
+                    and Mean Average Precision (mAP) following standard Market-1501 evaluation protocol.
+                </p>
+
+                <table class="metrics-table" id="metrics_table">
+                    <thead>
+                        <tr>
+                            <th>Dataset Split</th>
+                            <th>Query Images</th>
+                            <th>Gallery Images</th>
+                            <th>Rank-1 Accuracy</th>
+                            <th>Rank-5 Accuracy</th>
+                            <th>Rank-10 Accuracy</th>
+                            <th>mAP</th>
+                        </tr>
+                    </thead>
+                    <tbody id="metrics_tbody">
+                        <!-- Populated dynamically -->
+                    </tbody>
+                </table>
+            </section>
+        </div>
+
+    </main>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

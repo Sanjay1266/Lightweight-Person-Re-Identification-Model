@@ -1,0 +1,18 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# PyTorch Checkpoints & Output Artifacts
+checkpoints/
+static/outputs/*.png
+static/outputs/*.jpg
+*.log
+
+# Environment & IDE
+.venv/
+env/
+ENV/
+.vscode/
+.idea/
+.DS_Store
