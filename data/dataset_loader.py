@@ -123,7 +123,7 @@ def build_transforms(height=256, width=128, is_train=True):
             T.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
             T.ToTensor(),
             T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-            T.RandomErasing(probability=0.5, mean=[0.485, 0.456, 0.406])
+            T.RandomErasing(p=0.5, value=[0.485, 0.456, 0.406])
         ])
     else:
         transform = T.Compose([

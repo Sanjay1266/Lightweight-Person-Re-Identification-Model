@@ -16,8 +16,11 @@ class ReIDEngine:
         self.model = LightweightReIDNet(num_classes=num_classes, feat_dim=512)
         if model_path and os.path.exists(model_path):
             state_dict = torch.load(model_path, map_location=self.device)
-            self.model.load_state_dict(state_dict, strict=False)
-            print(f"=> Loaded model weights from '{model_path}'")
+            model_dict = self.model.state_dict()
+            filtered_dict = {k: v for k, v in state_dict.items() if k in model_dict and v.shape == model_dict[k].shape}
+            model_dict.update(filtered_dict)
+            self.model.load_state_dict(model_dict)
+            print(f"=> Loaded model weights from '{model_path}' ({len(filtered_dict)}/{len(state_dict)} matched)")
 
         self.model.to(self.device)
         self.model.eval()
@@ -47,21 +50,43 @@ class ReIDEngine:
         """
         query_feat, query_pil, query_tensor = self.extract_feature(query_img_path)
 
-        gallery_feats = []
-        gallery_info = []
+        if not hasattr(self, '_gallery_cache'):
+            self._gallery_cache = {}
 
-        for g_path, g_pid, g_camid in gallery_samples:
-            g_feat, _, _ = self.extract_feature(g_path)
-            gallery_feats.append(g_feat)
-            gallery_info.append({
-                'img_path': g_path,
-                'pid': g_pid,
-                'camid': g_camid
-            })
+        # Cache key based on gallery sample paths
+        cache_key = tuple(x[0] for x in gallery_samples[:10]) + (len(gallery_samples),)
+        if cache_key in self._gallery_cache:
+            gallery_feats, gallery_info = self._gallery_cache[cache_key]
+        else:
+            gallery_feats = []
+            gallery_info = []
+            # Batch extraction for fast inference
+            batch_size = 32
+            for i in range(0, len(gallery_samples), batch_size):
+                chunk = gallery_samples[i:i + batch_size]
+                tensors = []
+                for g_path, g_pid, g_camid in chunk:
+                    try:
+                        img = Image.open(g_path).convert('RGB')
+                        t = self.transform(img)
+                        tensors.append(t)
+                        gallery_info.append({
+                            'img_path': g_path,
+                            'pid': g_pid,
+                            'camid': g_camid
+                        })
+                    except Exception:
+                        continue
+                if tensors:
+                    batch_tensor = torch.stack(tensors).to(self.device)
+                    with torch.no_grad():
+                        feats = self.model(batch_tensor).cpu().numpy()
+                    gallery_feats.append(feats)
 
-        gallery_feats = np.array(gallery_feats)
+            gallery_feats = np.vstack(gallery_feats) if gallery_feats else np.empty((0, 512))
+            self._gallery_cache[cache_key] = (gallery_feats, gallery_info)
+
         distmat = compute_distance_matrix(query_feat.reshape(1, -1), gallery_feats, metric='cosine')[0]
-
         indices = np.argsort(distmat)
 
         top_matches = []

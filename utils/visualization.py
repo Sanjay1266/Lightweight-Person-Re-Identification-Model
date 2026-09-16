@@ -15,14 +15,25 @@ def generate_attention_heatmap(model, img_tensor, original_pil_img, save_path=No
         img_tensor = img_tensor.unsqueeze(0)
 
     with torch.no_grad():
-        stem_out = model.stem(img_tensor)
-        l1 = model.layer1(stem_out)
-        l2 = model.layer2(l1)
-        l3 = model.layer3(l2)
-        feat_map = model.layer4(l3)
+        if hasattr(model, 'stage1'):
+            stem_out = model.stem(img_tensor)
+            s1 = model.stage1(stem_out)
+            s2 = model.stage2(s1)
+            s3 = model.stage3(s2)
+            base_feat = model.stage4(s3)
+            f_irrel, f_rel, recon_irrel, recon_rel = model.crd(base_feat)
+            assembled = model.dad(base_feat, f_irrel)
+            activation_map = assembled[0]
+        else:
+            stem_out = model.stem(img_tensor)
+            l1 = model.layer1(stem_out)
+            l2 = model.layer2(l1)
+            l3 = model.layer3(l2)
+            feat_map = model.layer4(l3)
+            activation_map = feat_map[0]
 
     # Average activation across channels
-    heatmap = torch.mean(feat_map[0], dim=0).cpu().numpy()
+    heatmap = torch.mean(activation_map, dim=0).cpu().numpy()
     heatmap = np.maximum(heatmap, 0)
     if np.max(heatmap) > 0:
         heatmap /= np.max(heatmap)
@@ -40,17 +51,17 @@ def generate_attention_heatmap(model, img_tensor, original_pil_img, save_path=No
     overlay = 0.55 * img_np + 0.45 * colored_heatmap
     overlay = np.clip(overlay, 0, 1)
 
-    fig, axes = plt.subplots(1, 3, figsize=(10, 4))
+    fig, axes = plt.subplots(1, 3, figsize=(11, 4))
     axes[0].imshow(original_pil_img)
-    axes[0].set_title("Input Query Image")
+    axes[0].set_title("Input Query Image", fontsize=11, fontweight='bold')
     axes[0].axis('off')
 
     axes[1].imshow(heatmap_np, cmap='jet')
-    axes[1].set_title("Attention Activation")
+    axes[1].set_title("CRD Disentangled Attention", fontsize=11, fontweight='bold')
     axes[1].axis('off')
 
     axes[2].imshow(overlay)
-    axes[2].set_title("CBAM Feature Focus Overlay")
+    axes[2].set_title("DAD Assembled Identity Feature", fontsize=11, fontweight='bold')
     axes[2].axis('off')
 
     plt.tight_layout()

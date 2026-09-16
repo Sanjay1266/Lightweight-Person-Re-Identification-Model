@@ -165,7 +165,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Load Metrics Table
+    // Load Metrics Table & Summary Cards
     async function loadMetrics() {
         const tbody = document.getElementById('metrics_tbody');
         if (!tbody) return;
@@ -193,8 +193,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 `;
                 tbody.appendChild(row);
             });
+
+            // Update top summary cards with benchmark data
+            if (data.metrics.length > 0) {
+                const b = data.metrics[0];
+                const r1 = document.getElementById('card_rank1');
+                const r5 = document.getElementById('card_rank5');
+                const r10 = document.getElementById('card_rank10');
+                const mapCard = document.getElementById('card_map');
+                if (r1) r1.textContent = `${b.rank1}%`;
+                if (r5) r5.textContent = `${b.rank5}%`;
+                if (r10) r10.textContent = `${b.rank10}%`;
+                if (mapCard) mapCard.textContent = `${b.mAP}%`;
+            }
         } catch (err) {
             console.error('Metrics loading error:', err);
         }
     }
+
+    // Initial load of metrics
+    loadMetrics();
 });
