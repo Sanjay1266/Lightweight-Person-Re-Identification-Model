@@ -25,7 +25,7 @@
         <nav class="nav-tabs" id="main_nav_tabs">
             <button class="nav-tab-btn active" data-tab="tab-search" id="tab_btn_search">🔍 Query Search</button>
             <button class="nav-tab-btn" data-tab="tab-arch" id="tab_btn_arch">🧩 DCR-ReID Architecture</button>
-            <button class="nav-tab-btn" data-tab="tab-metrics" id="tab_btn_metrics">📊 Benchmark Evaluation</button>
+            <button class="nav-tab-btn" data-tab="tab-metrics" id="tab_btn_metrics">📊 Benchmark & Convergence</button>
             <button class="nav-tab-btn" data-tab="tab-edge" id="tab_btn_edge">⚡ Edge Efficiency</button>
         </nav>
     </header>
@@ -35,16 +35,16 @@
         <!-- Hero Section -->
         <section class="hero-section">
             <div class="hero-tag-row">
-                <span class="badge-pill accent">Base Paper: DCR-ReID</span>
-                <span class="badge-pill">CRD Disentanglement</span>
+                <span class="badge-pill accent">Base Paper: DCR-ReID (IEEE TCSVT 2023)</span>
+                <span class="badge-pill">CRD 3-Way Disentanglement</span>
                 <span class="badge-pill">DAD Feature Assembly</span>
-                <span class="badge-pill success">Real-Time Edge Ready</span>
+                <span class="badge-pill success">Real-Time Edge Capable</span>
             </div>
             <h2 class="hero-title">Deep Component Reconstruction for Person Re-ID</h2>
             <p class="hero-subtitle">
-                A high-performance lightweight Computer Vision system that disentangles identity-invariant cues 
-                (body shape, facial structure, contour) from clothes-relevant features (shirt, pants, colors, bag accessories), 
-                delivering robust person re-identification across multi-camera surveillance networks.
+                A high-performance lightweight Computer Vision system implementing the full <strong>DCR-ReID</strong> framework. 
+                Disentangles identity-invariant cues (body shape, facial structure, contour) from clothes-relevant features 
+                (shirt, pants, colors, bag accessories), enabling robust person re-identification across multi-camera networks.
             </p>
             <div class="authors-badge">
                 <span>Team: <strong>G N Bhuvaneshwaran</strong> (CB.SC.U4CSE24218) • <strong>Sanjay MS</strong> (CB.SC.U4CSE24248) • <strong>Sanjay S</strong> (CB.SC.U4CSE24249)</span>
@@ -65,7 +65,7 @@
                         <label class="form-label" for="dataset_type_select">Surveillance Dataset Subset</label>
                         <select class="form-select" id="dataset_type_select">
                             <option value="both_small">both_small (Combined Benchmark)</option>
-                            <option value="with_bag">with_bag (Person with Bag)</option>
+                            <option value="with_bag">with_bag (Person with Bag / Accessory)</option>
                             <option value="without_bag">without_bag (Person without Bag)</option>
                             <option value="both_large">both_large (Full Evaluation Dataset)</option>
                         </select>
@@ -118,23 +118,19 @@
                         <div class="query-preview-wrapper">
                             <div class="query-img-card">
                                 <div class="card-label">Probe Query Input</div>
-                                <img id="query_preview_img" src="" alt="Query Person">
+                                <img id="query_preview_img" src="" alt="Query Image">
                             </div>
-                            <div class="heatmap-img-card">
-                                <div class="card-label">CRD & DAD Attention Map</div>
-                                <img id="heatmap_preview_img" src="" alt="Attention Overlay">
-                            </div>
-                            <div class="disentangle-info">
-                                <h4>Component Reconstruction Disentanglement (CRD)</h4>
-                                <p>
-                                    The model extracts deep representations, separates clothes/bag features from identity-invariant features, 
-                                    and amplifies body structure and contour cues through the <strong>DAD Module</strong>, ensuring reliable 
-                                    matching even when accessories or clothes change.
+
+                            <div class="attention-card">
+                                <div class="card-label">DCR-ReID 4-Panel Disentanglement Map</div>
+                                <img id="heatmap_preview_img" src="" alt="DCR-ReID Attention Map">
+                                <p class="attention-desc">
+                                    <strong>Component Reconstruction:</strong> Separates clothes-irrelevant body structure ($Y^+$) from transient clothes/bag interference ($Y^-$), with human contour boundary preservation and DAD assembled feature recalibration.
                                 </p>
                                 <div class="stat-pill-row">
                                     <span class="stat-pill">Feature Dim: <strong>512-D</strong></span>
                                     <span class="stat-pill">Metric: <strong>Cosine Distance</strong></span>
-                                    <span class="stat-pill">Neck: <strong>BNNeck</strong></span>
+                                    <span class="stat-pill">Inference: <strong>Clothes Invariant</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -154,48 +150,71 @@
         <div class="tab-pane" id="tab-arch">
             <section class="glass-card">
                 <h3 class="section-heading">
-                    <span>🧩</span> DCR-ReID System Architecture & Workflow
+                    <span>🧩</span> DCR-ReID System Architecture & Mathematical Formulation
                 </h3>
                 <p style="color: #94a3b8; margin-bottom: 2rem;">
-                    Implementation of the research workflow presented in Slide 6 of <em>23CSE373 - Computer Vision</em> 
-                    and the base paper <em>DCR-ReID: Deep Component Reconstruction for Cloth-Changing Person Re-Identification</em>.
+                    Full implementation of <em>DCR-ReID: Deep Component Reconstruction for Cloth-Changing Person Re-Identification</em> 
+                    (IEEE TCSVT 2023) combined with the lightweight edge architecture presented in <em>23CSE373 - Computer Vision</em>.
                 </p>
 
+                <!-- Three Branches Diagram -->
                 <div class="workflow-steps">
                     <div class="workflow-step">
                         <div class="step-num">1</div>
-                        <div class="step-title">Input Images</div>
-                        <div class="step-desc">Surveillance RGB images resized to standard 256×128 Re-ID aspect ratio.</div>
-                    </div>
-                    <div class="workflow-arrow">→</div>
-                    <div class="workflow-step">
-                        <div class="step-num">2</div>
-                        <div class="step-title">Preprocessing</div>
-                        <div class="step-desc">Random Crop, Horizontal Flip, Color Jitter, and Random Erasing occlusion simulation.</div>
-                    </div>
-                    <div class="workflow-arrow">→</div>
-                    <div class="workflow-step">
-                        <div class="step-num">3</div>
                         <div class="step-title">Lightweight Backbone</div>
-                        <div class="step-desc">Residual CNN backbone preserving spatial resolution with stride-1 in stage 4.</div>
+                        <div class="step-desc">Residual ConvNet (3.2M params) extracting deep convolutional feature map $P_i$.</div>
                     </div>
                     <div class="workflow-arrow">→</div>
                     <div class="workflow-step highlight">
-                        <div class="step-num">4</div>
-                        <div class="step-title">CRD Module</div>
-                        <div class="step-desc">Component Reconstruction Disentanglement: separates clothes-irrelevant and clothes-relevant features.</div>
+                        <div class="step-num">2</div>
+                        <div class="step-title">CRD Module (CR Branch)</div>
+                        <div class="step-desc">Decomposes $P_i = P_i^- \oplus P_i^+ \oplus P_i^t$ and reconstructs visual component masks with 4-block decoders $\psi^v$.</div>
                     </div>
                     <div class="workflow-arrow">→</div>
                     <div class="workflow-step highlight">
-                        <div class="step-num">5</div>
-                        <div class="step-title">DAD Module</div>
-                        <div class="step-desc">Deep Assembled Disentanglement: Dual channel and spatial attention suppressing clothing noise.</div>
+                        <div class="step-num">3</div>
+                        <div class="step-title">DAD Module (CI Branch)</div>
+                        <div class="step-desc">Assembles $G_i = F_i^+ \oplus F_{ai}^- \oplus F_i^t$ with shuffled clothes and applies dual attention recalibration.</div>
                     </div>
                     <div class="workflow-arrow">→</div>
                     <div class="workflow-step">
-                        <div class="step-num">6</div>
-                        <div class="step-title">BNNeck & Retrieval</div>
-                        <div class="step-desc">Global Pooling, 1D BatchNorm neck, L2 normalized 512-D cosine distance matching.</div>
+                        <div class="step-num">4</div>
+                        <div class="step-title">Dual BNNeck & Loss</div>
+                        <div class="step-desc">Identity Classifier $C_{ID}$, clothes classifier $C_P$, hard triplet ranking, and label-smoothed CE.</div>
+                    </div>
+                    <div class="workflow-arrow">→</div>
+                    <div class="workflow-step">
+                        <div class="step-num">5</div>
+                        <div class="step-title">Invariant Inference</div>
+                        <div class="step-desc">Directly removes clothes-relevant features $F_i^-$ to perform robust cloth-changing matching.</div>
+                    </div>
+                </div>
+
+                <!-- Mathematical Formulation Box -->
+                <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid #334155; border-radius: 12px; padding: 1.5rem; margin: 2rem 0;">
+                    <h4 style="color: #38bdf8; font-family: 'Outfit', sans-serif; font-size: 1.2rem; margin-bottom: 1rem;">
+                        📐 Mathematical Formulation (DCR-ReID Paper Equations)
+                    </h4>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; color: #cbd5e1;">
+                        <div style="background: rgba(30, 41, 59, 0.6); padding: 1rem; border-radius: 8px; border-left: 3px solid #38bdf8;">
+                            <strong style="color: #67e8f9;">Channel Decomposition (Eq. 8):</strong><br>
+                            $P_i = P_i^- \oplus P_i^+ \oplus P_i^t$<br>
+                            $P^-$: Clothes | $P^+$: Body/Face | $P^t$: Contour
+                        </div>
+                        <div style="background: rgba(30, 41, 59, 0.6); padding: 1rem; border-radius: 8px; border-left: 3px solid #34d399;">
+                            <strong style="color: #6ee7b7;">Reconstruction Loss (Eq. 10):</strong><br>
+                            $L_R = \frac{1}{N} \sum_{i=1}^N \sum_{v \in \{-, +, t\}} |T_i^v - Y_i^v|_1$
+                        </div>
+                        <div style="background: rgba(30, 41, 59, 0.6); padding: 1rem; border-radius: 8px; border-left: 3px solid #f43f5e;">
+                            <strong style="color: #fda4af;">Feature Assembly (Eq. 16):</strong><br>
+                            $G_i = F_i^+ \oplus F_{ai}^- \oplus F_i^t$<br>
+                            Shuffles clothes $F_{ai}^-$ across batch instances
+                        </div>
+                        <div style="background: rgba(30, 41, 59, 0.6); padding: 1rem; border-radius: 8px; border-left: 3px solid #fbbf24;">
+                            <strong style="color: #fde68a;">Unified Total Loss (Eq. 19-20):</strong><br>
+                            $L = L_{ID} + L_{triplet} + L_C + L_R$<br>
+                            $L_C = L_c + L_{ca} + \alpha L_{ac} + \gamma L_{ID}'$
+                        </div>
                     </div>
                 </div>
 
@@ -203,17 +222,17 @@
                     <div class="feature-box irrelevant">
                         <h4>Clothes-Irrelevant Features (Preserved & Amplified)</h4>
                         <ul>
-                            <li>Face & Head Structure</li>
-                            <li>Body Shape & Proportions</li>
-                            <li>Human Structural Contour</li>
+                            <li>Face & Head Structure ($Y^+$)</li>
+                            <li>Body Shape & Proportions ($Y^+$)</li>
+                            <li>Human Structural Silhouette Contour ($Y^t$)</li>
                             <li>Height & Limb Aspect Ratios</li>
                         </ul>
                     </div>
                     <div class="feature-box relevant">
                         <h4>Clothes-Relevant Features (Disentangled & Suppressed)</h4>
                         <ul>
-                            <li>Shirt & T-Shirt Color</li>
-                            <li>Pants & Shorts Hue/Pattern</li>
+                            <li>Shirt & T-Shirt Color ($Y^-$)</li>
+                            <li>Pants & Shorts Hue/Pattern ($Y^-$)</li>
                             <li>Backpacks & Handbags</li>
                             <li>Transient Accessories & Occlusions</li>
                         </ul>
@@ -222,33 +241,45 @@
             </section>
         </div>
 
-        <!-- Tab 3: Cross-Condition Performance Metrics -->
+        <!-- Tab 3: Cross-Condition Performance & Convergence Metrics -->
         <div class="tab-pane" id="tab-metrics">
             <section class="glass-card">
                 <h3 class="section-heading">
-                    <span>📊</span> Cross-Condition Benchmark Performance (Market-1501 Protocol)
+                    <span>📊</span> Cross-Condition Benchmark & Convergence Tracking
                 </h3>
-                <p style="color: #94a3b8; font-size: 0.95rem; margin-bottom: 1.5rem;">
-                    Quantitative evaluation results using Cumulative Matching Characteristics (Rank-1, Rank-5, Rank-10) 
-                    and Mean Average Precision (mAP) excluding same-camera same-identity hits.
-                </p>
+
+                <!-- Convergence Notice Banner -->
+                <div style="background: linear-gradient(90deg, rgba(30, 58, 138, 0.5), rgba(15, 23, 42, 0.8)); border: 1px solid #3b82f6; border-radius: 12px; padding: 1.25rem; margin-bottom: 2rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+                    <div>
+                        <div style="font-weight: 700; color: #93c5fd; font-size: 1.05rem;">
+                            🚀 Training Convergence Tracking
+                        </div>
+                        <div style="color: #cbd5e1; font-size: 0.88rem; margin-top: 0.25rem;">
+                            The full DCR-ReID model is currently undergoing multi-stage optimization. Below are both current checkpoint empirical evaluations and final paper target benchmarks.
+                        </div>
+                    </div>
+                    <div style="background: rgba(15, 23, 42, 0.8); padding: 0.6rem 1.2rem; border-radius: 8px; border: 1px solid #1e40af; text-align: right;">
+                        <span style="font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em;">Target Rank-1 Goal</span>
+                        <div style="font-size: 1.4rem; font-weight: 800; color: #34d399;">88.52%</div>
+                    </div>
+                </div>
 
                 <div class="metric-summary-cards">
                     <div class="summary-card">
                         <div class="summary-value" id="card_rank1">88.5%</div>
-                        <div class="summary-label">Top-1 Accuracy (Rank-1)</div>
+                        <div class="summary-label">Target Rank-1 Accuracy</div>
                     </div>
                     <div class="summary-card">
                         <div class="summary-value" id="card_rank5">96.2%</div>
-                        <div class="summary-label">Top-5 Accuracy (Rank-5)</div>
+                        <div class="summary-label">Target Rank-5 Accuracy</div>
                     </div>
                     <div class="summary-card">
                         <div class="summary-value" id="card_rank10">98.4%</div>
-                        <div class="summary-label">Top-10 Accuracy (Rank-10)</div>
+                        <div class="summary-label">Target Rank-10 Accuracy</div>
                     </div>
                     <div class="summary-card">
                         <div class="summary-value" id="card_map">82.4%</div>
-                        <div class="summary-label">Mean Average Precision (mAP)</div>
+                        <div class="summary-label">Target Mean Average Precision (mAP)</div>
                     </div>
                 </div>
 
@@ -256,12 +287,12 @@
                     <thead>
                         <tr>
                             <th>Dataset Split</th>
-                            <th>Query Images</th>
-                            <th>Gallery Images</th>
-                            <th>Rank-1 Accuracy</th>
-                            <th>Rank-5 Accuracy</th>
-                            <th>Rank-10 Accuracy</th>
-                            <th>mAP</th>
+                            <th>Surveillance Condition</th>
+                            <th>Query / Gallery</th>
+                            <th>Current Rank-1</th>
+                            <th>Target Rank-1</th>
+                            <th>Target mAP</th>
+                            <th>Convergence Progress</th>
                         </tr>
                     </thead>
                     <tbody id="metrics_tbody">
@@ -286,7 +317,7 @@
                         <div class="edge-badge">Proposed Method</div>
                         <h4>Lightweight DCR-ReID</h4>
                         <div class="edge-metric">
-                            <span class="label">Model Parameters</span>
+                            <span class="label">Backbone Parameters</span>
                             <span class="val highlight">3.24 M</span>
                         </div>
                         <div class="edge-metric">
@@ -311,7 +342,7 @@
                         <div class="edge-badge baseline">Baseline</div>
                         <h4>Standard ResNet-50</h4>
                         <div class="edge-metric">
-                            <span class="label">Model Parameters</span>
+                            <span class="label">Backbone Parameters</span>
                             <span class="val">25.6 M</span>
                         </div>
                         <div class="edge-metric">

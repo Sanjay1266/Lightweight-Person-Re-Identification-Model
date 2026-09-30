@@ -1,26 +1,42 @@
+"""
+Re-Identification Inference Engine
+Supports fast feature extraction, gallery ranking, and DCR-ReID component map extraction.
+Base Paper: "DCR-ReID: Deep Component Reconstruction for Cloth-Changing Person Re-Identification" (IEEE TCSVT 2023)
+"""
+
 import os
 import torch
 import numpy as np
 from PIL import Image
-from models.lightweight_reid import LightweightReIDNet
-from data.dataset_loader import build_transforms, PersonReIDDataset
-from utils.metrics import compute_distance_matrix, eval_market1501
+from models.lightweight_reid import LightweightDCRReID
+from data.dataset_loader import build_transforms
+from utils.metrics import compute_distance_matrix
 
 class ReIDEngine:
-    def __init__(self, model_path=None, num_classes=751, device=None):
+    def __init__(self, model_path=None, num_classes=250, device=None):
         if device is None:
             self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         else:
             self.device = device
 
-        self.model = LightweightReIDNet(num_classes=num_classes, feat_dim=512)
+        # Detect num_classes from checkpoint if available
+        if model_path and os.path.exists(model_path):
+            try:
+                ckpt_header = torch.load(model_path, map_location='cpu')
+                if 'classifier.weight' in ckpt_header:
+                    num_classes = ckpt_header['classifier.weight'].shape[0]
+            except Exception:
+                pass
+
+        self.model = LightweightDCRReID(num_classes=num_classes, feat_dim=512, inference_mode='clothes_invariant')
+
         if model_path and os.path.exists(model_path):
             state_dict = torch.load(model_path, map_location=self.device)
             model_dict = self.model.state_dict()
             filtered_dict = {k: v for k, v in state_dict.items() if k in model_dict and v.shape == model_dict[k].shape}
             model_dict.update(filtered_dict)
             self.model.load_state_dict(model_dict)
-            print(f"=> Loaded model weights from '{model_path}' ({len(filtered_dict)}/{len(state_dict)} matched)")
+            print(f"=> Loaded model weights from '{model_path}' ({len(filtered_dict)}/{len(model_dict)} tensors matched)")
 
         self.model.to(self.device)
         self.model.eval()

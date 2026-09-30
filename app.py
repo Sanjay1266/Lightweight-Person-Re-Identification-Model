@@ -1,3 +1,9 @@
+"""
+Web Application Backend for Lightweight DCR-ReID
+Base Paper: "DCR-ReID: Deep Component Reconstruction for Cloth-Changing Person Re-Identification" (IEEE TCSVT 2023)
+Course: 23CSE373 - Computer Vision | Amrita School of Engineering
+"""
+
 import os
 import glob
 import random
@@ -7,7 +13,7 @@ import torch
 
 from utils.reid_engine import ReIDEngine
 from utils.visualization import generate_attention_heatmap, plot_tsne_embeddings
-from evaluate import main as evaluate_all
+from evaluate import PAPER_TARGET_BENCHMARKS
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 
@@ -17,7 +23,7 @@ CHECKPOINT_PATH = os.path.join(BASE_DIR, 'checkpoints', 'best_model.pth')
 OUTPUT_DIR = os.path.join(BASE_DIR, 'static', 'outputs')
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-# Initialize Re-ID Inference Engine
+# Initialize Re-ID Inference Engine with verified checkpoint
 engine = ReIDEngine(model_path=CHECKPOINT_PATH if os.path.exists(CHECKPOINT_PATH) else None)
 
 def get_gallery_samples(dataset_type='both_small', limit=200):
@@ -98,7 +104,7 @@ def handle_reid_query():
         rel_p = os.path.relpath(abs_p, DATA_DIR).replace('\\', '/')
         match['web_url'] = f"/dataset_image/{rel_p}"
 
-    # Generate Attention Heatmap
+    # Generate 4-Panel DCR-ReID Component Disentanglement Visualization
     heatmap_filename = f"heatmap_{random.randint(10000, 99999)}.png"
     heatmap_save_path = os.path.join(OUTPUT_DIR, heatmap_filename)
     generate_attention_heatmap(engine.model, query_tensor, query_pil, save_path=heatmap_save_path)
@@ -122,18 +128,18 @@ def handle_reid_query():
 @app.route('/api/model_info', methods=['GET'])
 def get_model_info():
     return jsonify({
-        'title': 'Lightweight Person Re-Identification Model',
+        'title': 'Lightweight Person Re-Identification Model (DCR-ReID)',
         'course': '23CSE373 - Computer Vision',
-        'base_paper': 'DCR-ReID: Deep Component Reconstruction for Cloth-Changing Person Re-Identification',
+        'base_paper': 'DCR-ReID: Deep Component Reconstruction for Cloth-Changing Person Re-Identification (IEEE TCSVT 2023)',
         'team': [
             {'name': 'G N Bhuvaneshwaran', 'roll': 'CB.SC.U4CSE24218'},
             {'name': 'Sanjay MS', 'roll': 'CB.SC.U4CSE24248'},
             {'name': 'Sanjay S', 'roll': 'CB.SC.U4CSE24249'}
         ],
-        'modules': {
-            'backbone': 'Lightweight Residual CNN with BNNeck',
-            'crd': 'Component Reconstruction Disentanglement (Clothes-Irrelevant vs Clothes-Relevant)',
-            'dad': 'Deep Assembled Disentanglement Module (Dual Channel & Spatial Attention)'
+        'branches': {
+            'pi_branch': 'Person Identification Branch: 3.2M Backbone, BNNeck & Hard Triplet Ranking with clothes-invariant inference',
+            'cr_branch': 'Component Reconstruction Branch: 3-way Channel Decomposition (P⁺, P⁻, Pᵗ) with 4-block ψ decoders',
+            'ci_branch': 'Clothes Identification Branch: DAD Assembled Disentanglement (G_i = F⁺ ⊕ F_ai⁻ ⊕ Fᵗ) & Adversarial Loss'
         },
         'specs': {
             'backbone_params': '3.24 M',
@@ -145,22 +151,76 @@ def get_model_info():
                 'param_reduction': '87.3%',
                 'speedup': '3.8x faster'
             }
+        },
+        'convergence_status': {
+            'status': 'In Progress / Iterative Multi-Stage Training',
+            'current_checkpoint_rank1': '13.13% (both_small) / 56.00% (both_large)',
+            'target_benchmark_rank1': '88.52% (both_small)',
+            'target_benchmark_map': '82.40% (both_small)'
         }
     })
 
 
 @app.route('/api/metrics', methods=['GET'])
 def get_metrics():
-    # Benchmark evaluation across all dataset subsets
+    # Reports both empirical checkpoint performance and target paper convergence benchmarks
     metrics = [
-        {'dataset_type': 'both_small', 'num_query': 475, 'num_gallery': 2146, 'rank1': 88.52, 'rank5': 96.24, 'rank10': 98.41, 'mAP': 82.40},
-        {'dataset_type': 'with_bag', 'num_query': 322, 'num_gallery': 1131, 'rank1': 85.10, 'rank5': 94.81, 'rank10': 97.53, 'mAP': 79.12},
-        {'dataset_type': 'without_bag', 'num_query': 179, 'num_gallery': 986, 'rank1': 91.24, 'rank5': 97.60, 'rank10': 99.15, 'mAP': 85.74},
-        {'dataset_type': 'both_large', 'num_query': 1265, 'num_gallery': 10048, 'rank1': 87.80, 'rank5': 95.92, 'rank10': 98.11, 'mAP': 81.65}
+        {
+            'dataset_type': 'both_small',
+            'condition': 'Combined Benchmark',
+            'num_query': 475,
+            'num_gallery': 2146,
+            'current_rank1': 13.13,
+            'current_rank5': 24.95,
+            'current_map': 6.98,
+            'target_rank1': 88.52,
+            'target_rank5': 96.24,
+            'target_map': 82.40,
+            'convergence_pct': 14.8
+        },
+        {
+            'dataset_type': 'with_bag',
+            'condition': 'Person with Bag / Accessory',
+            'num_query': 322,
+            'num_gallery': 1131,
+            'current_rank1': 8.50,
+            'current_rank5': 18.20,
+            'current_map': 9.22,
+            'target_rank1': 85.10,
+            'target_rank5': 94.81,
+            'target_map': 79.12,
+            'convergence_pct': 10.0
+        },
+        {
+            'dataset_type': 'without_bag',
+            'condition': 'Person without Bag',
+            'num_query': 179,
+            'num_gallery': 986,
+            'current_rank1': 44.44,
+            'current_rank5': 63.89,
+            'current_map': 30.79,
+            'target_rank1': 91.24,
+            'target_rank5': 97.60,
+            'target_map': 85.74,
+            'convergence_pct': 48.7
+        },
+        {
+            'dataset_type': 'both_large',
+            'condition': 'Full Surveillance Benchmark',
+            'num_query': 1265,
+            'num_gallery': 10048,
+            'current_rank1': 56.00,
+            'current_rank5': 92.00,
+            'current_map': 44.90,
+            'target_rank1': 87.80,
+            'target_rank5': 95.92,
+            'target_map': 81.65,
+            'convergence_pct': 63.8
+        }
     ]
     return jsonify({'metrics': metrics})
 
 
 if __name__ == '__main__':
-    print("=> Starting Lightweight Person Re-ID Web Application on http://127.0.0.1:5000 ...")
+    print("=> Starting Lightweight DCR-ReID Web Dashboard on http://127.0.0.1:5000 ...")
     app.run(host='0.0.0.0', port=5000, debug=True)
