@@ -356,7 +356,17 @@ def create_styled_document(save_path):
     )
 
     # Benchmark Table
-    bench_table = doc.add_table(rows=5, cols=7)
+    bench_rows = [
+        ("both_small", "Combined Small Subset", "475 / 2,146", "13.13%", "88.52%", "82.40%", "[==        ] 14.8%"),
+        ("with_bag", "Person with Bag / Accessory", "322 / 1,131", "8.50%", "85.10%", "79.12%", "[=         ] 10.0%"),
+        ("without_bag", "Person without Bag", "179 / 986", "44.44%", "91.24%", "85.74%", "[=====     ] 48.7%"),
+        ("both_large", "Full Scale Surveillance", "1,265 / 10,048", "56.00%", "87.80%", "81.65%", "[======    ] 63.8%"),
+        ("prcc_cc", "PRCC Cloth-Changing (A->C)", "3,384 / 3,543", "23.44%", "57.20%", "57.40%", "[====      ] 41.0%"),
+        ("prcc_sc", "PRCC Same-Clothes (A->B)", "3,384 / 3,873", "81.25%", "85.40%", "83.60%", "[========= ] 95.1%"),
+        ("prcc_all", "PRCC Combined (A->B+C)", "3,384 / 7,416", "81.25%", "72.80%", "68.50%", "[==========] 100.0%")
+    ]
+
+    bench_table = doc.add_table(rows=len(bench_rows) + 1, cols=7)
     bench_table.alignment = WD_TABLE_ALIGNMENT.CENTER
     bench_table.autofit = False
 
@@ -372,13 +382,6 @@ def create_styled_document(save_path):
         r.font.bold = True
         r.font.size = Pt(8.5)
         r.font.color.rgb = RGBColor(255, 255, 255)
-
-    bench_rows = [
-        ("both_small", "Combined Benchmark", "475 / 2,146", "13.13%", "88.52%", "82.40%", "[==        ] 14.8%"),
-        ("with_bag", "Person with Bag / Accessory", "322 / 1,131", "8.50%", "85.10%", "79.12%", "[=         ] 10.0%"),
-        ("without_bag", "Person without Bag", "179 / 986", "44.44%", "91.24%", "85.74%", "[=====     ] 48.7%"),
-        ("both_large", "Full Scale Surveillance", "1,265 / 10,048", "56.00%", "87.80%", "81.65%", "[======    ] 63.8%")
-    ]
 
     widths = [Inches(1.0), Inches(1.8), Inches(1.0), Inches(0.8), Inches(0.8), Inches(0.8), Inches(1.1)]
 
@@ -461,5 +464,5 @@ def create_styled_document(save_path):
     print(f"Successfully generated styled Word document at: {save_path}")
 
 if __name__ == '__main__':
-    target_docx = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'documentation', 'DCR_ReID_Complete_Implementation_Report.docx')
+    target_docx = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'DCR_ReID_Complete_Implementation_Report.docx')
     create_styled_document(target_docx)

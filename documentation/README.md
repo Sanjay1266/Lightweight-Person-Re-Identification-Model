@@ -24,6 +24,7 @@ Welcome to the comprehensive technical documentation for the **Lightweight Perso
 | **[3. Code Changes & Git Diff](file:///s:/5th%20Sem/CV/Lightweight_Person_Re-Identification_Model/documentation/CODE_CHANGES_AND_DIFF.md)** | Detailed audit of all modifications between the previous baseline and the updated implementation across all 10 modified files. |
 | **[4. Benchmarks & Convergence Tracking](file:///s:/5th%20Sem/CV/Lightweight_Person_Re-Identification_Model/documentation/BENCHMARK_AND_CONVERGENCE.md)** | Cross-condition evaluation results (CMC Rank-1/5/10, mAP), current checkpoint accuracy vs final paper convergence targets, and edge complexity vs ResNet-50. |
 | **[5. User & Deployment Guide](file:///s:/5th%20Sem/CV/Lightweight_Person_Re-Identification_Model/documentation/USER_GUIDE.md)** | Step-by-step instructions for running benchmark evaluation, CLI query search, two-stage PyTorch model training, and the Flask Glassmorphism Web Dashboard. |
+| **[6. Model Outputs Specification](file:///s:/5th%20Sem/CV/Lightweight_Person_Re-Identification_Model/documentation/MODEL_OUTPUTS.md)** | Comprehensive breakdown of all output tensors across training, clothes-invariant inference, visual decoders, and downstream retrieval APIs. |
 
 ---
 

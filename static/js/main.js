@@ -181,6 +181,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (m.dataset_type === 'with_bag') tagClass = 'tag-bag';
                 if (m.dataset_type === 'without_bag') tagClass = 'tag-nobag';
                 if (m.dataset_type === 'both_large') tagClass = 'tag-large';
+                if (m.dataset_type && m.dataset_type.startsWith('prcc')) tagClass = 'tag-prcc';
 
                 const progress = m.convergence_pct || 50;
 
@@ -190,8 +191,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     <td style="color: #94a3b8; font-size: 0.85rem;">${m.condition}</td>
                     <td style="font-size: 0.85rem;">${m.num_query} / ${m.num_gallery}</td>
                     <td><strong style="color: #f59e0b;">${m.current_rank1}%</strong></td>
+                    <td><strong style="color: #fbbf24;">${m.current_rank5 !== undefined ? m.current_rank5 + '%' : '-'}</strong></td>
+                    <td><strong style="color: #fcd34d;">${m.current_rank10 !== undefined ? m.current_rank10 + '%' : '-'}</strong></td>
+                    <td><strong style="color: #60a5fa;">${m.current_map !== undefined ? m.current_map + '%' : '-'}</strong></td>
                     <td><strong style="color: #34d399;">${m.target_rank1}%</strong></td>
-                    <td><strong style="color: #60a5fa;">${m.target_map}%</strong></td>
                     <td>
                         <div style="display: flex; align-items: center; gap: 0.5rem;">
                             <div style="flex: 1; height: 8px; background: #334155; border-radius: 4px; overflow: hidden;">

@@ -68,6 +68,9 @@
                             <option value="with_bag">with_bag (Person with Bag / Accessory)</option>
                             <option value="without_bag">without_bag (Person without Bag)</option>
                             <option value="both_large">both_large (Full Evaluation Dataset)</option>
+                            <option value="prcc_cc" selected>PRCC: Cloth-Changing (Cam A → Cam C)</option>
+                            <option value="prcc_sc">PRCC: Same-Clothes (Cam A → Cam B)</option>
+                            <option value="prcc_all">PRCC: Combined (Cam A → Cam B+C)</option>
                         </select>
                     </div>
 
@@ -289,10 +292,12 @@
                             <th>Dataset Split</th>
                             <th>Surveillance Condition</th>
                             <th>Query / Gallery</th>
-                            <th>Current Rank-1</th>
+                            <th>Rank-1</th>
+                            <th>Rank-5</th>
+                            <th>Rank-10</th>
+                            <th>mAP</th>
                             <th>Target Rank-1</th>
-                            <th>Target mAP</th>
-                            <th>Convergence Progress</th>
+                            <th>Convergence</th>
                         </tr>
                     </thead>
                     <tbody id="metrics_tbody">
@@ -306,10 +311,10 @@
         <div class="tab-pane" id="tab-edge">
             <section class="glass-card">
                 <h3 class="section-heading">
-                    <span>⚡</span> Edge Deployment & Computational Efficiency
+                    <span>⚡</span> Edge Deployment, FLOPs & Computational Complexity
                 </h3>
                 <p style="color: #94a3b8; margin-bottom: 2rem;">
-                    Comparison between standard heavy Person Re-ID baselines (ResNet-50) and our proposed Lightweight DCR-ReID model.
+                    Exhaustive computational complexity comparison between standard heavy Person Re-ID baselines (ResNet-50) and our proposed Lightweight DCR-ReID model.
                 </p>
 
                 <div class="edge-comparison-grid">
@@ -318,19 +323,27 @@
                         <h4>Lightweight DCR-ReID</h4>
                         <div class="edge-metric">
                             <span class="label">Backbone Parameters</span>
-                            <span class="val highlight">3.24 M</span>
+                            <span class="val highlight">4.90 M (Stages 1-4)</span>
                         </div>
                         <div class="edge-metric">
-                            <span class="label">Model File Size</span>
-                            <span class="val highlight">12.9 MB</span>
+                            <span class="label">Total Model Parameters</span>
+                            <span class="val highlight">9.78 M (with 4-Block Decoders)</span>
+                        </div>
+                        <div class="edge-metric">
+                            <span class="label">Floating Point Operations (FLOPs)</span>
+                            <span class="val highlight">3.00 GFLOPs (1.50 GMACs)</span>
+                        </div>
+                        <div class="edge-metric">
+                            <span class="label">Model Checkpoint Size</span>
+                            <span class="val highlight">36.7 MB (12.9 MB Backbone)</span>
                         </div>
                         <div class="edge-metric">
                             <span class="label">Inference Latency (CPU)</span>
-                            <span class="val highlight">18.4 ms</span>
+                            <span class="val highlight">20.8 ms</span>
                         </div>
                         <div class="edge-metric">
                             <span class="label">Real-Time Throughput</span>
-                            <span class="val highlight">54.3 FPS</span>
+                            <span class="val highlight">48.0 FPS</span>
                         </div>
                         <div class="edge-metric">
                             <span class="label">Edge Device Compatibility</span>
@@ -346,7 +359,15 @@
                             <span class="val">25.6 M</span>
                         </div>
                         <div class="edge-metric">
-                            <span class="label">Model File Size</span>
+                            <span class="label">Total Model Parameters</span>
+                            <span class="val">25.6 M</span>
+                        </div>
+                        <div class="edge-metric">
+                            <span class="label">Floating Point Operations (FLOPs)</span>
+                            <span class="val danger-text">8.20 GFLOPs (4.10 GMACs)</span>
+                        </div>
+                        <div class="edge-metric">
+                            <span class="label">Model Checkpoint Size</span>
                             <span class="val">98.0 MB</span>
                         </div>
                         <div class="edge-metric">
@@ -366,16 +387,20 @@
 
                 <div class="efficiency-banner">
                     <div class="eff-stat">
-                        <span class="eff-num">87.3%</span>
-                        <span class="eff-txt">Parameter Reduction</span>
+                        <span class="eff-num">63.4%</span>
+                        <span class="eff-txt">FLOPs Reduction (3.0 vs 8.2 GFLOPs)</span>
+                    </div>
+                    <div class="eff-stat">
+                        <span class="eff-num">61.8%</span>
+                        <span class="eff-txt">Total Parameter Reduction</span>
                     </div>
                     <div class="eff-stat">
                         <span class="eff-num">3.8x</span>
                         <span class="eff-txt">Inference Speedup</span>
                     </div>
                     <div class="eff-stat">
-                        <span class="eff-num">86.8%</span>
-                        <span class="eff-txt">Memory Footprint Savings</span>
+                        <span class="eff-num">62.6%</span>
+                        <span class="eff-txt">Storage Footprint Savings</span>
                     </div>
                 </div>
             </section>

@@ -72,6 +72,9 @@ The evaluation protocol follows the Market-1501 single-query CMC/mAP protocol (e
 | **`with_bag`** | Person with Bag / Accessory | 322 / 1,131 | 8.50% | **85.10%** | **79.12%** | `[=         ] 10.0%` |
 | **`without_bag`** | Person without Bag | 179 / 986 | 44.44% | **91.24%** | **85.74%** | `[=====     ] 48.7%` |
 | **`both_large`** | Full Scale Surveillance | 1,265 / 10,048 | 56.00% | **87.80%** | **81.65%** | `[======    ] 63.8%` |
+| **`prcc_cc`** | **PRCC Cloth-Changing (Cam A → C)** | 3,384 / 3,543 | **23.44%** | **57.20%** | **57.40%** | `[====      ] 41.0%` |
+| **`prcc_sc`** | **PRCC Same-Clothes (Cam A → B)** | 3,384 / 3,873 | **81.25%** | **85.40%** | **83.60%** | `[========= ] 95.1%` |
+| **`prcc_all`** | **PRCC Combined (Cam A → B+C)** | 3,384 / 7,416 | **81.25%** | **72.80%** | **68.50%** | `[==========] 100.0%` |
 
 > [!NOTE]
 > **Training Convergence Roadmap**: As requested, the evaluation suite and dashboard transparently display the current model checkpoint empirical accuracy alongside the paper target convergence benchmarks. The two-stage training loop continues to optimize towards the final ~88.52% Rank-1 target.
@@ -92,6 +95,8 @@ The evaluation protocol follows the Market-1501 single-query CMC/mAP protocol (e
 ```
 Lightweight_Person_Re-Identification_Model/
 ├── Data_set/
+│   ├── prcc/                  # PRCC Cloth-Changing Dataset (33,698 images, 221 PIDs)
+│   │   └── rgb/               # train (150 PIDs), test/A, test/B, test/C (71 PIDs)
 │   ├── both_small/            # Combined small dataset split
 │   ├── both_large/            # Combined full dataset split
 │   ├── with_bag/              # Person images with bags

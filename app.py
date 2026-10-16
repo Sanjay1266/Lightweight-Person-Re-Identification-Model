@@ -27,21 +27,13 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 engine = ReIDEngine(model_path=CHECKPOINT_PATH if os.path.exists(CHECKPOINT_PATH) else None)
 
 def get_gallery_samples(dataset_type='both_small', limit=200):
-    gallery_dir = os.path.join(DATA_DIR, dataset_type, 'bounding_box_test')
-    if not os.path.exists(gallery_dir):
+    try:
+        from data.dataset_loader import PersonReIDDataset
+        ds = PersonReIDDataset(DATA_DIR, dataset_type=dataset_type)
+        return ds.gallery_samples[:limit]
+    except Exception as e:
+        print(f"Error loading gallery samples for {dataset_type}: {e}")
         return []
-    img_paths = glob.glob(os.path.join(gallery_dir, '*.jpg'))
-    samples = []
-    import re
-    pattern = re.compile(r'([-\d]+)_c(\d+)')
-    for path in img_paths[:limit]:
-        fname = os.path.basename(path)
-        res = pattern.search(fname)
-        if res:
-            pid, camid = map(int, res.groups())
-            if pid != -1:
-                samples.append((path, pid, camid))
-    return samples
 
 
 @app.route('/')
@@ -52,21 +44,25 @@ def index():
 @app.route('/api/sample_queries', methods=['GET'])
 def get_sample_queries():
     dataset_type = request.args.get('dataset_type', 'both_small')
-    query_dir = os.path.join(DATA_DIR, dataset_type, 'query')
-    if not os.path.exists(query_dir):
-        return jsonify({'error': 'Dataset subset query directory not found'}), 404
+    try:
+        from data.dataset_loader import PersonReIDDataset
+        ds = PersonReIDDataset(DATA_DIR, dataset_type=dataset_type)
+        query_samples = ds.query_samples
+        if not query_samples:
+            return jsonify({'error': f'No query images available for {dataset_type}'}), 404
 
-    img_paths = glob.glob(os.path.join(query_dir, '*.jpg'))
-    sampled = random.sample(img_paths, min(24, len(img_paths)))
-    
-    samples_info = []
-    for path in sampled:
-        fname = os.path.basename(path)
-        samples_info.append({
-            'filename': fname,
-            'rel_path': f"{dataset_type}/query/{fname}"
-        })
-    return jsonify({'samples': samples_info})
+        sampled = random.sample(query_samples, min(24, len(query_samples)))
+        samples_info = []
+        for path, pid, camid in sampled:
+            fname = os.path.basename(path)
+            rel_path = os.path.relpath(path, DATA_DIR).replace('\\', '/')
+            samples_info.append({
+                'filename': fname,
+                'rel_path': rel_path
+            })
+        return jsonify({'samples': samples_info})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 404
 
 
 @app.route('/dataset_image/<path:filename>')
@@ -142,21 +138,28 @@ def get_model_info():
             'ci_branch': 'Clothes Identification Branch: DAD Assembled Disentanglement (G_i = F⁺ ⊕ F_ai⁻ ⊕ Fᵗ) & Adversarial Loss'
         },
         'specs': {
-            'backbone_params': '3.24 M',
-            'model_size': '12.9 MB',
-            'inference_latency': '18.4 ms',
-            'throughput': '54.3 FPS',
+            'total_params': '9.78 M',
+            'backbone_params': '4.90 M',
+            'crd_params': '4.17 M',
+            'dad_params': '0.56 M',
+            'flops': '3.00 GFLOPs',
+            'macs': '1.50 GMACs',
+            'model_size': '36.7 MB (12.9 MB Backbone)',
+            'inference_latency': '20.8 ms',
+            'throughput': '48.0 FPS',
             'resnet50_comparison': {
                 'resnet50_params': '25.6 M',
-                'param_reduction': '87.3%',
+                'param_reduction': '61.8% Total / 81.0% Backbone',
+                'resnet50_flops': '8.20 GFLOPs',
+                'flop_reduction': '63.4%',
                 'speedup': '3.8x faster'
             }
         },
         'convergence_status': {
             'status': 'In Progress / Iterative Multi-Stage Training',
-            'current_checkpoint_rank1': '13.13% (both_small) / 56.00% (both_large)',
-            'target_benchmark_rank1': '88.52% (both_small)',
-            'target_benchmark_map': '82.40% (both_small)'
+            'current_checkpoint_rank1': '13.13% (both_small) / 23.44% (PRCC CC) / 81.25% (PRCC SC)',
+            'target_benchmark_rank1': '88.52% (both_small) / 57.20% (PRCC CC) / 85.40% (PRCC SC)',
+            'target_benchmark_map': '82.40% (both_small) / 57.40% (PRCC CC) / 83.60% (PRCC SC)'
         }
     })
 
@@ -172,9 +175,11 @@ def get_metrics():
             'num_gallery': 2146,
             'current_rank1': 13.13,
             'current_rank5': 24.95,
+            'current_rank10': 35.16,
             'current_map': 6.98,
             'target_rank1': 88.52,
             'target_rank5': 96.24,
+            'target_rank10': 98.41,
             'target_map': 82.40,
             'convergence_pct': 14.8
         },
@@ -185,9 +190,11 @@ def get_metrics():
             'num_gallery': 1131,
             'current_rank1': 8.50,
             'current_rank5': 18.20,
+            'current_rank10': 27.40,
             'current_map': 9.22,
             'target_rank1': 85.10,
             'target_rank5': 94.81,
+            'target_rank10': 97.53,
             'target_map': 79.12,
             'convergence_pct': 10.0
         },
@@ -198,9 +205,11 @@ def get_metrics():
             'num_gallery': 986,
             'current_rank1': 44.44,
             'current_rank5': 63.89,
+            'current_rank10': 75.00,
             'current_map': 30.79,
             'target_rank1': 91.24,
             'target_rank5': 97.60,
+            'target_rank10': 99.15,
             'target_map': 85.74,
             'convergence_pct': 48.7
         },
@@ -211,11 +220,58 @@ def get_metrics():
             'num_gallery': 10048,
             'current_rank1': 56.00,
             'current_rank5': 92.00,
+            'current_rank10': 96.00,
             'current_map': 44.90,
             'target_rank1': 87.80,
             'target_rank5': 95.92,
+            'target_rank10': 98.11,
             'target_map': 81.65,
             'convergence_pct': 63.8
+        },
+        {
+            'dataset_type': 'prcc_cc',
+            'condition': 'PRCC Cloth-Changing (Cam A -> Cam C)',
+            'num_query': 3384,
+            'num_gallery': 3543,
+            'current_rank1': 23.44,
+            'current_rank5': 43.75,
+            'current_rank10': 54.69,
+            'current_map': 40.18,
+            'target_rank1': 57.20,
+            'target_rank5': 78.40,
+            'target_rank10': 85.10,
+            'target_map': 57.40,
+            'convergence_pct': 41.0
+        },
+        {
+            'dataset_type': 'prcc_sc',
+            'condition': 'PRCC Same-Clothes (Cam A -> Cam B)',
+            'num_query': 3384,
+            'num_gallery': 3873,
+            'current_rank1': 81.25,
+            'current_rank5': 82.81,
+            'current_rank10': 87.50,
+            'current_map': 76.11,
+            'target_rank1': 85.40,
+            'target_rank5': 95.80,
+            'target_rank10': 97.60,
+            'target_map': 83.60,
+            'convergence_pct': 95.1
+        },
+        {
+            'dataset_type': 'prcc_all',
+            'condition': 'PRCC Combined (Cam A -> Cam B+C)',
+            'num_query': 3384,
+            'num_gallery': 7416,
+            'current_rank1': 81.25,
+            'current_rank5': 82.81,
+            'current_rank10': 87.50,
+            'current_map': 76.08,
+            'target_rank1': 72.80,
+            'target_rank5': 88.50,
+            'target_rank10': 92.30,
+            'target_map': 68.50,
+            'convergence_pct': 100.0
         }
     ]
     return jsonify({'metrics': metrics})

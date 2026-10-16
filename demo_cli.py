@@ -38,8 +38,16 @@ def run_demo(query_img_path, dataset_type='both_small', top_k=5, model_path='./c
     print("==========================================================================\n")
 
 def find_default_query(data_dir='./Data_set', dataset_type='both_small'):
+    try:
+        ds = PersonReIDDataset(data_dir=data_dir, dataset_type=dataset_type)
+        if ds.query_samples:
+            return ds.query_samples[0][0]
+    except Exception:
+        pass
+
     candidates = [
         os.path.join(data_dir, dataset_type, 'query'),
+        os.path.join(data_dir, 'prcc', 'rgb', 'test', 'A', '001'),
         os.path.join(data_dir, 'with_bag', 'query'),
         os.path.join(data_dir, 'without_bag', 'query'),
         os.path.join(data_dir, 'both_small', 'query')

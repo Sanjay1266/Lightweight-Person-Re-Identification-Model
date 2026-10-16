@@ -9,6 +9,9 @@ static/outputs/*.png
 static/outputs/*.jpg
 *.log
 
+# Large Datasets
+Data_set/prcc/
+
 # Environment & IDE
 .venv/
 env/

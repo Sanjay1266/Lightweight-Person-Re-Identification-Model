@@ -100,7 +100,7 @@ def evaluate_model(model, query_loader, gallery_loader, device, max_eval_q=100, 
     return rank1, rank5, rank10, mAP_pct
 
 
-def train(data_dir='./Data_set', dataset_type='both_small', epochs=15, batch_size=16, lr=0.0003, save_dir='./checkpoints'):
+def train(data_dir='./Data_set', dataset_type='both_small', epochs=15, batch_size=16, lr=0.0003, save_dir='./checkpoints', max_batches=None):
     os.makedirs(save_dir, exist_ok=True)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"=> DCR-ReID Training Initialized on Device: {device}")
@@ -142,8 +142,12 @@ def train(data_dir='./Data_set', dataset_type='both_small', epochs=15, batch_siz
         running_id = 0.0
         running_triplet = 0.0
         running_recon = 0.0
+        batches_processed = 0
 
         for batch_idx, (imgs, pids, cams, _) in enumerate(train_loader, start=1):
+            if max_batches is not None and batch_idx > max_batches:
+                break
+
             imgs = imgs.to(device)
             pids = pids.to(device)
 
@@ -169,10 +173,11 @@ def train(data_dir='./Data_set', dataset_type='both_small', epochs=15, batch_siz
             running_id += loss_dict['loss_id'].item()
             running_triplet += loss_dict['loss_triplet'].item()
             running_recon += loss_dict['loss_recon'].item()
+            batches_processed += 1
 
         scheduler.step()
 
-        n_batches = len(train_loader)
+        n_batches = max(1, batches_processed)
         avg_loss = running_loss / n_batches
         avg_id = running_id / n_batches
         avg_trip = running_triplet / n_batches
@@ -203,11 +208,15 @@ def train(data_dir='./Data_set', dataset_type='both_small', epochs=15, batch_siz
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Train Lightweight DCR-ReID Model")
     parser.add_argument('--data_dir', type=str, default='./Data_set')
-    parser.add_argument('--dataset_type', type=str, default='both_small', choices=['both_small', 'with_bag', 'without_bag', 'both_large'])
+    parser.add_argument('--dataset_type', type=str, default='both_small', 
+                        choices=['both_small', 'with_bag', 'without_bag', 'both_large', 'prcc', 'prcc_cc', 'prcc_sc', 'prcc_all'])
     parser.add_argument('--epochs', type=int, default=15)
     parser.add_argument('--batch_size', type=int, default=16)
     parser.add_argument('--lr', type=float, default=0.0003)
     parser.add_argument('--save_dir', type=str, default='./checkpoints')
+    parser.add_argument('--max_batches', type=int, default=None, 
+                        help="Maximum training batches per epoch (useful for validation/quick testing)")
 
     args = parser.parse_args()
-    train(data_dir=args.data_dir, dataset_type=args.dataset_type, epochs=args.epochs, batch_size=args.batch_size, lr=args.lr, save_dir=args.save_dir)
+    train(data_dir=args.data_dir, dataset_type=args.dataset_type, epochs=args.epochs, batch_size=args.batch_size, 
+          lr=args.lr, save_dir=args.save_dir, max_batches=args.max_batches)
