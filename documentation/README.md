@@ -25,6 +25,7 @@ Welcome to the comprehensive technical documentation for the **Lightweight Perso
 | **[4. Benchmarks & Convergence Tracking](file:///s:/5th%20Sem/CV/Lightweight_Person_Re-Identification_Model/documentation/BENCHMARK_AND_CONVERGENCE.md)** | Cross-condition evaluation results (CMC Rank-1/5/10, mAP), current checkpoint accuracy vs final paper convergence targets, and edge complexity vs ResNet-50. |
 | **[5. User & Deployment Guide](file:///s:/5th%20Sem/CV/Lightweight_Person_Re-Identification_Model/documentation/USER_GUIDE.md)** | Step-by-step instructions for running benchmark evaluation, CLI query search, two-stage PyTorch model training, and the Flask Glassmorphism Web Dashboard. |
 | **[6. Model Outputs Specification](file:///s:/5th%20Sem/CV/Lightweight_Person_Re-Identification_Model/documentation/MODEL_OUTPUTS.md)** | Comprehensive breakdown of all output tensors across training, clothes-invariant inference, visual decoders, and downstream retrieval APIs. |
+| **[7. Training & Validation Guide](file:///s:/5th%20Sem/CV/Lightweight_Person_Re-Identification_Model/documentation/TRAINING_AND_VALIDATION.md)** | Full report on model training status, PRCC validation logs, multi-task losses, and CPU vs GPU multi-epoch training commands. |
 
 ---
 
@@ -37,4 +38,4 @@ The **Lightweight DCR-ReID** system solves this by:
 2. **Reconstructing** human body components and silhouette contours to strictly regularize clothes-irrelevant features.
 3. **Assembling** features ($G_i = F_i^+ \oplus F_{ai}^- \oplus F_i^t$) with permuted clothes to enforce invariant identity classification.
 4. **Stripping** clothes-relevant features ($F_i^-$) during inference, achieving pure clothing-invariant metric matching.
-5. **Compressing** the model to 3.24M parameters (87.3% smaller than ResNet-50) for 54+ FPS real-time edge execution.
+5. **Compressing** the model to 9.78M total parameters (4.90M backbone, 3.00 GFLOPs with 63.4% FLOP reduction vs ResNet-50) for 48+ FPS real-time edge execution.
