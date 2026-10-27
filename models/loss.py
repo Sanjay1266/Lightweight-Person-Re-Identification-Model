@@ -54,6 +54,7 @@ class TripletLoss(nn.Module):
     def forward(self, inputs, targets):
         if inputs is None or targets is None:
             return torch.tensor(0.0, device=inputs.device if inputs is not None else 'cpu')
+        inputs = inputs.float()
         n = inputs.size(0)
         # Compute pairwise distance matrix
         dist = torch.pow(inputs, 2).sum(dim=1, keepdim=True).expand(n, n)
