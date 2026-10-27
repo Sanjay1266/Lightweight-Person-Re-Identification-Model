@@ -26,6 +26,7 @@ Welcome to the comprehensive technical documentation for the **Lightweight Perso
 | **[5. User & Deployment Guide](file:///s:/5th%20Sem/CV/Lightweight_Person_Re-Identification_Model/documentation/USER_GUIDE.md)** | Step-by-step instructions for running benchmark evaluation, CLI query search, two-stage PyTorch model training, and the Flask Glassmorphism Web Dashboard. |
 | **[6. Model Outputs Specification](file:///s:/5th%20Sem/CV/Lightweight_Person_Re-Identification_Model/documentation/MODEL_OUTPUTS.md)** | Comprehensive breakdown of all output tensors across training, clothes-invariant inference, visual decoders, and downstream retrieval APIs. |
 | **[7. Training & Validation Guide](file:///s:/5th%20Sem/CV/Lightweight_Person_Re-Identification_Model/documentation/TRAINING_AND_VALIDATION.md)** | Full report on model training status, PRCC validation logs, multi-task losses, and CPU vs GPU multi-epoch training commands. |
+| **[8. Review-3: Overview of Models & Benchmarks](file:///s:/5th%20Sem/CV/Lightweight_Person_Re-Identification_Model/documentation/REVIEW_3_OVERVIEW.md)** | Comprehensive Review-3 report: FLOPs, Parameters breakdown, dual-dataset PRCC & Market-1501 evaluation, Rank-1/5/10 & mAP tables, and viva Q&A. |
 
 ---
 
