@@ -1,0 +1,614 @@
+
+--- Page 1 ---
+IEEE TRANSACTIONS ON CIRCUITS AND SYSTEMS FOR VIDEO TECHNOLOGY , VOL. 33, NO. 8, AUGUST 2023 4415
+DCR-ReID: Deep Component Reconstruction for
+Cloth-Changing Person Re-Identification
+Zhenyu Cui, Jiahuan Zhou
+ , Member, IEEE, Yuxin Peng
+ , Senior Member, IEEE,
+Shiliang Zhang
+ , Senior Member, IEEE, and Yaowei Wang
+ , Member, IEEE
+Abstract— Person re-identification (Re-ID) plays an important
+role in many areas such as robotics, multimedia and forensics.
+However, it becomes difficult when considering long-term sce-
+narios, due to changing clothes irregularly for people. Therefore,
+cloth-changing person re-identification (CC-ReID) has attracted
+more attention recently. CC-ReID aims to identify the same
+person but with different clothes. Its main challenge is how to dis-
+entangle clothes-irrelevant features, such as face, shape, body, etc.
+Most existing methods force the model to learn clothes-irrelevant
+features by changing the colour of clothes or reconstructing peo-
+ple dressed in different colours. However, due to the lack of the
+ground truth for supervision, these methods inevitably introduce
+noises which spoil the discriminativeness of features and lead
+to uncontrollable disentanglement. In this paper, we propose
+a novel disentanglement framework, called Deep Component
+Reconstruction Re-ID (DCR-ReID), which can disentangle the
+clothes-irrelevant features and the clothes-relevant features in
+a controllable manner. Specifically, we propose a Component
+Reconstruction Disentanglement (CRD) module to disentangle
+the clothes-irrelevant features and the clothes-relevant features
+based on the reconstruction of human component regions.
+In addition, we propose a Deep Assembled Disentanglement
+(DAD) module, which further improves the discriminativeness
+of these disentangled features. Extensive experiments on three
+real-world benchmark CC-ReID datasets, LTCC, PRCC, and
+CCVID, are conducted to demonstrate the effectiveness of the
+proposed DCR-ReID. Empirical studies show that our DCR-ReID
+achieves the state-of-the-art performance against the other CC-
+ReID methods. The source code of this paper is available at
+https://github.com/PKU-ICST-MIPL/DCR-ReID_TCSVT2023.
+Index Terms— Person re-identification, cloth-changing
+re-identification, disentanglement, component reconstruction.
+Manuscript received 15 September 2022; revised 23 December 2022;
+accepted 18 January 2023. Date of publication 3 February 2023; date of
+current version 4 August 2023. This work was supported in part by the
+National Key Research and Development Program of China under Grant
+2021YFF0901502 and in part by the National Natural Science Founda-
+tion of China under Grant 61925201 and Grant 62132001. This article
+was recommended by Associate Editor R. Du. (Corresponding author:
+Yuxin Peng.)
+Zhenyu Cui and Jiahuan Zhou are with the Wangxuan Institute of Computer
+Technology, Peking University, Beijing 100871, China.
+Yuxin Peng is with the Wangxuan Institute of Computer Technology, Peking
+University, Beijing 100871, China, and also with the Peng Cheng Laboratory,
+Shenzhen 518055, China (e-mail: pengyuxin@pku.edu.cn).
+Shiliang Zhang is with the School of Computer Science, Peking University,
+Beijing 100871, China.
+Yaowei Wang is with the Peng Cheng Laboratory, Shenzhen 518055, China.
+Color versions of one or more figures in this article are available at
+https://doi.org/10.1109/TCSVT.2023.3241988.
+Digital Object Identifier 10.1109/TCSVT.2023.3241988
+I. I NTRODUCTION
+P
+ERSON
+re-identification (Re-ID) aims at matching the
+same person across different times and locations. With
+the rapid development of deep learning, deep neural network-
+based Re-ID methods have significantly advanced the progress
+of this challenging and important task. These methods mine
+discriminative features of people by extracting global or local
+features [1], [2] to obtain deep representations of pedestrians
+that can distinguish identities.
+However, most of the existing methods [3], [4], [5] can only
+handle the short-term Re-ID scenario as shown in Fig. 1(a).
+More specifically, the short-term Re-ID usually assumes that
+people hardly change their clothes within a short duration.
+Therefore, the salient colour and texture information of clothes
+can be readily used in discriminative features extraction.
+However, such information is usually unfavourable in the
+long-term Re-ID scenario, as shown in Fig. 1(b), because
+people may change clothes irregularly. More than that, such
+information has a negative impact when different people wear
+similar clothes. Overcoming changes of clothes is one of the
+most critical challenges in the long-term Re-ID when consid-
+ering how to extract clothes-irrelevant discriminative features.
+Therefore, some recent works have noticed such an impor-
+tant but challenging Re-ID setting, Cloth-Changing Re-ID
+(CC-ReID) [8], [9], [10]. Thus, in this paper, we specifically
+focus on facilitating CC-ReID by proposing a novel method.
+Existing solutions mainly aim to address CC-ReID
+based on two kinds of approaches: clothes-irrelevant fea-
+tures (fusion-based) [11], [12] and the disentanglement of
+clothes-irrelevant features (disentanglement-based) [7], [10].
+Usually, disentanglement-based Re-ID methods outperform
+the fusion-based ones since the fusion-based method can-
+not comprehensively enumerate and fuse all discriminative
+clothes-irrelevant features in an ad-hoc manner, whereas the
+disentanglement-based method overcomes the problem by sep-
+arating such features from the original image. Therefore, it pre-
+serves more identity-related information for identification.
+More specifically, the existing disentangle-based CC-ReID
+methods can be mainly categorized into two branches:
+data-driven disentanglement methods [7], [13], [14], [15]
+and feature-driven disentanglement methods [10], [16], [17],
+[18]. Data-driven disentanglement methods force the model
+to learn cloth-irrelevant features by randomly changing the
+pixel of clothing regions, thereby reducing its dependence
+on the colour and the texture information of clothes. To this
+1051-8215 © 2023 IEEE. Personal use is permitted, but republication/redistribution requires IEEE permission.
+See https://www.ieee.org/publications/rights/index.html for more information.
+Authorized licensed use limited to: AMRITA VISHWA VIDYAPEETHAM AMRITA SCHOOL OF ENGINEERING. Downloaded on July 23,2026 at 04:52:15 UTC from IEEE Xplore.  Restrictions apply. 
+--- Page 7 ---
+CUI et al.: DCR-ReID: DEEP COMPONENT RECONSTRUCTION FOR CLOTH-CHANGING Re-ID 4421
+Fig. 5. The illustration of the clothes category. ‘x’ represents the clothes
+category number. The clothes category is defined as the fine-grained category
+under the identity.
+difference between the two losses in Eq. 11 and Eq. 13 is
+that the former is the classification of single-positive-class for
+training a robust classifier to learn the clothes-relevant features,
+while the latter is the classification of multiple-positive-class
+for learning the clothes-irrelevant features, respectively.
+To improve the discriminativeness of the learned
+clothes-irrelevant features and the clothes-relevant features,
+we proposed to use the DAD module in CI branch. Compared
+with the mainstream improvement strategy based on the
+GAN [7] or pixel resampling [13] in RGB images, DAD
+assembles clothes-relevant features from different identities
+in deep feature vectors, and thus avoiding the spoiling of
+the most discriminative clothes-irrelevant information. Then,
+we detail the DAD.
+let F υ
+i be the feature vectors calculated from P υ
+i as follows:
+F υ
+i = ϕ( P υ
+i ), υ∈ {±,t}, (15)
+where ϕ(·) represents the batch normalization [50] with the
+global pooling. For the obtained feature vector F −
+i , F +
+i , and
+Ft
+i , we randomly shuffle F −
+i and Ft
+i to get F −
+ai and Ft
+ai , where
+ai is the new subscript. Then, we concatenate them to obtain
+the assembled results Gi as follows:
+Gi = F +
+i ⊕ F −
+ai ⊕ Ft
+i (16)
+Drawing on the data-driven disentanglement methods, the
+utilization of Gi can be viewed as the feature-level data aug-
+mentation. The assembled Gi forces the model to predict id (i)
+and its fine-grained categories using the clothes-irrelevant
+features belong to id (i) and the clothes-related features belong
+to others. Therefore, the discriminativeness of the extracted
+clothes-irrelevant features will be further highlighted due to
+its key role in predicting id (i) and its fine-grained categories,
+and thus its discriminativeness being improved. In addition,
+Gi does not contribute in the inference, and thus will not
+bring intra-class variation for CC-ReID. Now, the assembled
+results Gi have the clothes-irrelevant features belonging to
+xi and the clothes-relevant features belonging to xai . For
+the former, the identity classifier CI D is still explored to
+preserve the identity-sensitive discriminative information for
+xi. Following Eq. 5, the same loss function LI D′ is optimized
+based on Gi. For the latter, let the clothes-relevant features of
+xi and xai belong to different identities. Therefore, to improve
+TABLE I
+THE STATISTICS OF THE DATASETS UTILIZED FOR EVALUATION
+the discriminativeness of F +
+i and Ft
+ai , Gi is used to predict
+all fine-grained clothes categories belonging to id (i) base
+on the predictor of clothes CP. Similarly, to improve the
+discriminativeness of F −
+i , Gi is used to suppress the prediction
+of all fine-grained clothes categories that do not belong to
+id (i). To this end, we propose a novel assembled clothes
+loss function Lac to achieve this, which can be formalized
+as follows:
+Lac = −
+N∑
+i=1
+NU∑
+c=1
+h(c)
+× log
+
+ CP (Gi |c)
+CP (Gi |c) + ∑
+id ( j)̸=id (i)
+CP (Gi | j)
+
+ (17)
+h(c) =
+
+
+
+1
+K id (c) = id (i)
+0 , id (c) ̸= id (i)
+(18)
+Finally, the total loss function of CI branch is calculated as
+follows:
+LC = Lc + Lca + αLac + γ LI D′, (19)
+where α and γ represent two hyper-parameters for training.
+In summary, CI branch uses the assembled features to
+further improve the discriminativeness of the clothes-irrelevant
+features and the clothes-relevant features, and thus further
+facilitates CR branch.
+4) Total Loss Function: Finally, the total loss function of
+CI branch is calculated as follows:
+L = LI D + LC + LR (20)
+We adopt a two-stage optimization strategy [10] for training,
+which is detailed in the next section. Through the joint loss
+function L, DCR-ReID achieves controllable disentanglement
+for clothes-irrelevant features and clothes-relevant features.
+For inference, we directly remove the clothes-relevant features
+to force the model focus on the clothes-irrelevant features.
+IV. E XPERIMENTS
+In this section, we conduct extensive experiments to validate
+the effectiveness of our proposed DCR-ReID method.
+A. Datasets and Evaluations
+We conduct the validation experiments on three real-world
+benchmark CC-ReID datasets: LTCC [9], PRCC [8], and
+CCVID [10]. The summary of these datasets could be found
+in Tab. I.
+PRCC [8] dataset is a popular real-world CC-ReID dataset,
+which contains 33698 images of 221 identities. PRCC is one
+of the pioneers of cloth-changing Re-ID and is widely used to
+Authorized licensed use limited to: AMRITA VISHWA VIDYAPEETHAM AMRITA SCHOOL OF ENGINEERING. Downloaded on July 23,2026 at 04:52:15 UTC from IEEE Xplore.  Restrictions apply. 
+--- Page 8 ---
+4422 IEEE TRANSACTIONS ON CIRCUITS AND SYSTEMS FOR VIDEO TECHNOLOGY , VOL. 33, NO. 8, AUGUST 2023
+evaluate the state-of-the-art algorithms. However, it is limited
+by the diversity of scenarios (only collected by 3 cameras)
+and the variation of clothes (only 2 changes of clothes for
+each person).
+LTCC [9] dataset is one of the latest CC-ReID datasets,
+which contains 17119 images of 152 identities. Although the
+number of images of LTCC dataset is lower than that of PRCC
+dataset, the multiplied scenarios (collected by 12 cameras) and
+variants of clothes (up to 14 changes of clothes for each person
+at most) make it one of the most challenging CC-ReID dataset
+in recent years.
+CCVID [10] dataset is a large video CC-ReID dataset,
+which contains 347,833 images with 2,856 sequences from
+226 identities and each identity has 2 ∼ 5 suits of clothes.
+The CCVID dataset is closer to real-world Re-ID scenarios.
+The experiment on the large dataset helps to validate the
+generalization ability of the model.
+Evaluation Protocols. CMC@K (Cumulative Matching
+Characteristics of top K results) and mAP (mean Average
+Precision) are two widely used evaluation metrics in person
+Re-ID. We employ both of them to verify the proposed
+DCR-ReID. CMC@K is used to evaluate whether the top
+K re-identification results contain ground truth, while mAP
+is used to evaluate the overall accuracy of the algorithm for
+the re-identification results. We conduct experiments under the
+same setting for fair comparisons with the existing methods.
+For PRCC dataset, we conduct the same comparison under
+Same-Clothes (SC) and Cloth-Changing (CC) settings [8],
+where SC means that people in the query image and the gallery
+image are wearing the same clothes and CC means that they
+are wearing different clothes. For LTCC and CCVID datasets,
+we compare the proposed DCR-ReID with the state-of-the-art
+methods under General and CC settings [9], where the General
+is the combination of SC and CC.
+B. Implementation Details
+During training, following a similar protocol in [10],
+we adopt a two-stage optimization strategy to disentangle
+the clothes-irrelevant features based on a well-trained clothes
+classifier. It optimizes the loss functions of Lc + LI D + LR
+in the first stage and optimizes the full loss function L in
+the second stage. We set the hyper-parameters α and γ to
+0.05 and 1 in PRCC and CCVID datasets, and 0.05 and
+0 in LTCC dataset, respectively. We use ResNet-50 [56] with
+the pre-trained weight on ImageNet [58] as the backbone.
+We train the network on NVIDIA GTX1080TI GPUs. For
+PRCC and LTCC datasets, the batch size is set to 64, each
+batch contains 8 instances of 8 people with different identities.
+For CCVID datasets, the batch size is set to 8, each batch
+contains 4 instances of 2 people with different identities. The
+model is optimized using Adam [59] optimizer. The initial
+learning rate is set to 3.5 × 10−4, and the learning rate drops
+to 10% of the original every 20 epochs for For PRCC and
+LTCC datasets. For CCVID dataset, it drops every 40 epochs.
+Following [10], the random cropping, erasing, and flipping are
+employed as the data augmentation. Input images are resized
+to 384 × 192. The channel number of P +
+i , P −
+i , and Pt
+i are
+1024, 512, and 1024, respectively. Global pooling is the stack
+of max-pooling [60] and average-pooling.
+During inferring, we directly remove F −
+i in PI branch to
+calculate the distance between the query image and the images
+in the gallery.
+C. Determination of the Hyper-Parameters
+The proposed DCR-ReID introduces two hyper-parameters
+for training, α and γ . α is used to determine the loss weight of
+the assembled features for the clothes classification, while γ is
+used to determine the loss weight of the assembled features for
+the identity classification. The hyper-parameters α=0.05 with
+γ =1 are adopted on PRCC and CCVID datasets, while
+α=0.05 with γ =0 are adopted on LTCC dataset, respectively.
+D. Comparison With State-of-the-Art Methods
+First of all, we compare the proposed DCR-ReID with mul-
+tiple state-of-the-art Re-ID methods, including HACNN [51],
+PCB [29], IANet [52], SPT+ASE [8], GI-ReID [53],
+CESD [9], RCSANet [54], 3DSL [55] FSMA [16], CAL [10]
+on LTCC and PRCC datasets. Among them, HACNN [51],
+PCB [29], and IANet [52] are general Re-ID methods, while
+the others are CC-ReID methods. As shown in Tab. II, the pro-
+posed DCR-ReID achieves the state-of-the-art performance on
+LTCC and PRCC datasets. Specifically, the CMC@1/mAP per-
+formance of the proposed DCR-ReID method is 41.1%/20.4%
+and 57.2%/57.4% on both the LTCC and PRCC datasets under
+the CC setting. Compared with the existing state-of-the-art
+method [10], our DCR-ReID outperforms it by 1.0% and 2.4%
+for CMC@1 and mAP on LTCC.
+To validate the generalization ability of the proposed
+DCR-ReID, we compared the proposed DCR-ReID with
+state-of-the-art methods on a larger CC-ReID dataset, called
+CCVID, including: Baseline [56], which use ResNet-50
+as the backbone network and the identification loss for
+training, Triplet Loss [57], and CAL [10]. As shown in
+Tab. III, the proposed DCR-ReID outperforms the state-
+of-the-art methods on the CCVID dataset. Specifically,
+DCR-ReID achieves 83.6%/81.4% and 84.7%/82.7% on the
+CMC@1/mAP under the General setting and the CC setting.
+Particularly, DCR-ReID leads the state-of-the-art method [10]
+by 1.9% and 1.8% on the CMC@1/mAP under the CC setting.
+The above experimental results support that the proposed
+DCR-ReID can perform controllable disentanglement to obtain
+the clothes-irrelevant features and the clothes-relevant fea-
+tures, and can also improve the discriminativeness of these
+features effectively. In addition, although we remove the
+clothes-relevant features for inference, under the General set-
+ting on LTCC, DCR-ReID also achieves improvement (1.9%
+for CMC@1 and 1.5% for mAP on LTCC). The reason is
+that the clothes-irrelevant features extracted by DCR-ReID
+is more robust than the clothes-relevant features. Therefore,
+DCR-ReID is outstanding under the both settings. Moreover,
+the quantitative results in Tab. II are also verified by the visu-
+alization results in Fig. 6. The visualization results show that
+the proposed DCR-ReID can re-identify the person wearing
+different clothes more accurately when the style and colour of
+the clothes change drastically. The above results illustrates that
+the clothing-relevant feature disentangled by DCR-ReID can
+help re-identify people wearing the same or different clothes
+better.
+Authorized licensed use limited to: AMRITA VISHWA VIDYAPEETHAM AMRITA SCHOOL OF ENGINEERING. Downloaded on July 23,2026 at 04:52:15 UTC from IEEE Xplore.  Restrictions apply. 
+--- Page 9 ---
+CUI et al.: DCR-ReID: DEEP COMPONENT RECONSTRUCTION FOR CLOTH-CHANGING Re-ID 4423
+TABLE II
+COMPARISON WITH STATE-OF-THE -ART METHODS ON LTCC AND PRCC D ATASETS . (T HE BEST RESULTS
+ARE BOLDED AND THE SECOND BEST RESULTS ARE UNDERLINED )
+Fig. 6. Visualization of the comparison results of our method (Ours) and the baseline algorithm (B/L) [10]. The visualization results show that the proposed
+DCR-ReID can re-identify more correct instances in the gallery set compared with the baseline algorithm.
+TABLE III
+COMPARISON WITH STATE-OF-THE -ART METHODS ON CCVID
+DATASETS . (T HE BEST RESULTS ARE BOLDED AND THE
+SECOND BEST RESULTS ARE UNDERLINED )
+E. Ablation Study
+1) Hyper-Parameter Sensitivity Experiments: The proposed
+DCR-ReID method introduces two vital hyper-parameters for
+training, α and γ , which are directly related to the performance
+of DCR-ReID. Therefore, first of all, to determine the optimal
+combination of α and γ , we design the hyper-parameter
+sensitivity experiments on LTCC and PRCC datasets. First,
+we initially tried the settings of α and γ under 0.01, 0.1 and
+1 for the preliminary attempt. The results are shown in
+Fig. 7. Next, we fix γ with 1.0 and 0.0 to further explore
+the weight of α on PRCC and LTCC datasets, respectively.
+The further experimental results are shown in Tab. IV. This
+demonstrates that in scenarios with limited variants of clothes
+such as PRCC, the limited fine-grained clothes categories are
+difficult to facilitate the association with identity categories,
+and thereby weaken the identity discriminativeness of the
+assembled features. Therefore, in scenarios with limited vari-
+ants of clothes, the identity discriminativeness needs to be
+promoted by setting γ =1, while in scenarios with rich variants
+of clothes, γ should be smaller to facilitate the model to focus
+on the disentanglement. In summary, the hyper-parameters
+Authorized licensed use limited to: AMRITA VISHWA VIDYAPEETHAM AMRITA SCHOOL OF ENGINEERING. Downloaded on July 23,2026 at 04:52:15 UTC from IEEE Xplore.  Restrictions apply. 
+--- Page 10 ---
+4424 IEEE TRANSACTIONS ON CIRCUITS AND SYSTEMS FOR VIDEO TECHNOLOGY , VOL. 33, NO. 8, AUGUST 2023
+Fig. 7. Performance comparison of the proposed DCR-ReID with different
+hyper-parameters combinations of α and γ . (a) is the performance on LTCC.
+(b) is the performance on PRCC.
+α=0.05 with γ =1 and α=0.05 with γ =0 are adopted on PRCC
+and LTCC datasets, respectively.
+To verify the uneven divided channel number of P +
+i , P −
+i ,
+and Pt
+i that are 1024, 512, and 1024, we conduct experiments
+to compare the effects of even division and uneven division
+setting on PRCC and LTCC datasets. For even division, the
+channel numbers of P +
+i , P −
+i , and Pt
+i are all 1024. We use a
+convolutional layer with a kernel size of 1 × 1 to achieve
+the transformation of the channel numbers. As shown in
+Fig. 10(a) and 10(b), uneven division achieves the state-of-
+the-art performance on both LTCC and PRCC datasets from
+CMC@1 to CMC@20. This demonstrates that the disentan-
+gled features ( P +
+i , P −
+i , and Pt
+i ) have uneven contributions to
+CC-ReID. Specifically, the clothes-relevant feature is harmful
+to CC-ReID and thus its contribution is low and has fewer
+channel numbers. However, the clothes-irrelevant feature and
+the contour feature are equally significant to CC-ReID. There-
+fore, the channel number of P +
+i , P −
+i , and Pt
+i are set to 1024,
+512, and 1024, respectively.
+2) Effectiveness of DAD and CRD: Recall our proposed
+DCR-ReID method, there are two important modules, DAD
+and CRD. To verify the effectiveness of the proposed DAD
+and CRD. We conduct ablation studies on both LTCC and
+TABLE IV
+PERFORMANCE COMPARISON OF THE PROPOSED DCR-R EID W ITH FIXED
+γ ON LTCC AND PRCC D ATASETS . (T HE BEST RESULTS ARE BOLDED
+AND THE SECOND BEST RESULTS ARE UNDERLINED )
+PRCC datasets. The baseline method is [10]. As shown in
+Tab. V, when we only use DAD for disentanglement, the
+Re-ID accuracy is improved in PRCC dataset under the
+CC setting, where CMC@1/mAP improved from 53.4% and
+54.0% to 55.7% and 55.8%. However, it is lower than the
+state-of-the-art baseline algorithm on LTCC under the General
+setting, where CMC@1/mAP reduced from 75.1% and 41.0%
+to 72.4% and 39.9%, as well as under the CC setting. When
+we only use CRD, the accuracy improves significantly on
+both LTCC and PRCC datasets. This illustrates that CRD
+can effectively disentangle clothes-irrelevant features, while
+using DAD alone will reduce the accuracy when dealing with
+more complex scenarios and variants of clothes. It happens
+because DAD cannot ensure that the clothes-relevant features
+correspond to the region of clothes. Thus, when removing
+them for inference, it may bring mistakes by removing dis-
+criminative clothes-irrelevant features. Moreover, using DAD
+and CRD independently does not bring about an improvement
+for CMC@1 on LTCC, where CMC@1 is reduced by 2.7%
+and 0.5%, respectively. This is because DAD and CRD can
+each cover parts of the correct results on rank-1 respectively.
+However, when both CRD and DAD are used, the accuracy
+is further improved, which demonstrates that the DAD can
+benefit the CRD to further improving the overall performance.
+When the feature segments and the spatial component regions
+are consistent, CRD can further promote the disentanglement
+of clothes-irrelevant features and achieve the state-of-the-art
+performance.
+3) Influence of the Clothes-Relevant Features: As men-
+tioned before, when the clothes-relevant features are not cor-
+rectly corresponded to the regions of clothes, it may severely
+deteriorate the final performance when removing them for
+inference. To verify whether DCR-ReID can achieve this cor-
+respondence, we further experiment and visualize the results
+on LTCC and PRCC datasets for validation.
+As shown in Tab. VI, when we remove the cloths-relevant
+features, DCR-ReID achieves better Re-ID accuracy on LTCC
+(the CMC@1/mAP performance of the proposed DCR-ReID
+method improved by 1.6%/0.3% on both LTCC). However,
+on PRCC, the CMC@1/mAP performance of w/ and w/o CR
+is similar. The reason is that the cloth changes are limited on
+PRCC (only 2 clothes for each person), thus removing the
+clothes-relevant features are not critical. This illustrates that
+removing the clothes-relevant features is more suitable for
+Authorized licensed use limited to: AMRITA VISHWA VIDYAPEETHAM AMRITA SCHOOL OF ENGINEERING. Downloaded on July 23,2026 at 04:52:15 UTC from IEEE Xplore.  Restrictions apply. 
+--- Page 11 ---
+CUI et al.: DCR-ReID: DEEP COMPONENT RECONSTRUCTION FOR CLOTH-CHANGING Re-ID 4425
+TABLE V
+ABLATION STUDIES OF DAD AND CRD ON LTCC AND PRCC D ATASETS . (T HE BEST RESULTS ARE
+BOLDED AND THE SECOND BEST RESULTS ARE UNDERLINED )
+Fig. 8. Visualization of the reconstruction results output by CRD. Y +, Y −,
+and Y t represents the reconstruction results of the clothes-irrelevant features,
+the clothes-relevant features, and the contour features, respectively. T +, T −,
+and T t are their corresponding ground truth. The visualization results show
+that the extracted clothes-irrelevant features and the clothes-relevant features
+are correspond to the corresponding human component regions.
+TABLE VI
+COMPARISON WITH USING CLOTHES -RELEVANT FEATURES (CR)
+IN INFERENCE ON LTCC AND PRCC D ATASETS .
+(T HE BEST RESULTS ARE BOLDED )
+scenarios with variations clothes in CC-ReID. Nonetheless,
+for scenarios with less changes of clothes, removing the
+clothes-relevant features does not impair the performance as
+we analyzed in Tab. II. In general, removing clothes-relevant
+features can better adapt to the Re-ID under different clothing
+changes.
+As shown in Fig. 8, we visualize the reconstruction results
+output by CRD. The visualization results show that the
+clothes-relevant feature corresponds to the region of clothes,
+while the clothes-irrelevant feature corresponds to the remain-
+ing region of people. In addition, the contour features are
+also completely reconstructed. In summary, DCR-ReID can
+exactly disentangle clothes-irrelevant features and maintain
+the correspondence in inference. In the following sections,
+we further investigate the contribution of different reconstruc-
+tion branches in the proposed DCR-ReID model.
+Fig. 9. Visualization of the comparison results of our reconstruction (Ours)
+with the reconstruction using the deep features (w/ DF) and the construction
+using the RGB images (w/ RGB) output by CRD.
+4) Influence of the Reconstructing Branches: To illustrate
+the contribution of the reconstruction branches, we conduct
+various experiments on LTCC by gradually removing some
+of the reconstruction branches to evaluate the influence.
+As shown in Tab. VII, the baseline method is DCR-ReID
+without CRD (“Ours w/o I,R,C”). When we only use the
+cloths-irrelevant reconstruction branch (“Ours w/o R,C”),
+it improves mAP under the CC setting by 0.5%. When
+we further added clothes-relevant reconstruction and contour
+reconstruction (“Ours w/o C” and (“Ours”)), the mAP was
+improved by 1.3% and 2.3%, respectively. The above experi-
+mental results illustrate that simultaneously disentangling the
+clothes-irrelevant features and the clothes-relevant features can
+better utilize the complementary relationship between the two
+features to achieve the improvement. Therefore, learning to
+disentangle both of the features is more effective than learning
+a mixed clothes-irrelevant features. In addition, using the con-
+tour reconstruction can further improve the accuracy. This is
+Authorized licensed use limited to: AMRITA VISHWA VIDYAPEETHAM AMRITA SCHOOL OF ENGINEERING. Downloaded on July 23,2026 at 04:52:15 UTC from IEEE Xplore.  Restrictions apply. 
+--- Page 12 ---
+4426 IEEE TRANSACTIONS ON CIRCUITS AND SYSTEMS FOR VIDEO TECHNOLOGY , VOL. 33, NO. 8, AUGUST 2023
+Fig. 10. Impact of even/uneven division. (a) is the result on LTCC. (b) is
+the result on PRCC.
+TABLE VII
+COMPARISON WITH DIFFERENT RECONSTRUCTION
+BRANCHES . (T HE BEST RESULTS ARE BOLDED )
+TABLE VIII
+COMPARISON WITH DIFFERENT RECONSTRUCTION METHODS .
+(THE BEST RESULTS ARE BOLDED )
+because the clothes-relevant features and the clothes-irrelevant
+features can only model the local component regions, lacking
+the perception of the global shape. Therefore, fusing the con-
+tour reconstruction brings robust global shape information and
+thereby further improve the accuracy. In summary, the above
+experiments verify the effectiveness of the three branches for
+disentanglement.
+5) Influence of Difference Reconstruction Targets: As men-
+tioned before, the proposed DCR-ReID uses convolutional
+features to reconstruct the response map for disentanglement,
+instead of directly using the deep feature vectors extracted by
+the backbone network. Therefore, it is necessary to compare
+the two kinds of disentanglement to further illustrate the
+innovation of DCR-ReID. Thus, we further experiment and
+visualize the results on LTCC dataset for validation.
+As shown in Tab. VIII, when we use the deep features
+extracted by the backbone network for reconstruction (“w/
+DF”), the accuracy dropped by 3.1% and 2.8% for mAP under
+General and CC settings, respectively. When we use the RGB
+image as the ground truth (“w/ RGB”), the accuracy dropped
+by 2.1% and 1.9% for mAP. We further conduct visualization
+experiments for comparison, as shown in Fig. 9. The results
+show that when we use the deep features for reconstruction,
+the reconstructed images do not accurately correspond to the
+clothing and non-clothing regions. Moreover, when we use
+the RGB image as the ground truth, although the reconstructed
+images can reveal the colour information of the clothes, it does
+not reflect discriminative features well and the reconstructed
+regions are seriously incomplete. It reveals that the reconstruc-
+tion using convolutional features can achieve better accuracy
+than the deep features-based reconstruction. The reason is
+that the convolutional features can preserve more information
+on spatial than the deep features, thus it is more suitable to
+be used for reconstruction. In addition, reconstruction RGB
+images lead to poorer performance because the extracted
+high-level deep features usually contain less low-level detail
+information which is important for RGB image reconstruction.
+Fortunately, the proposed CRD and DAD can readily tackle
+this issue since it is simplified as the collaboration of CRD
+and DAD, which only reconstructs the component regions of
+the clothes-irrelevant features and the clothes-relevant features
+in CRD, and then improves the discriminativeness of these
+features in DAD. CRD and DAD promote each other and
+finally achieve the state-of-the-art result.
+V. C ONCLUSION
+In this paper, to tackle the challenge of changes of clothes
+in the long-term Re-ID, we propose a novel method, called
+Deep Component Reconstruction (DCR-ReID) for CC-ReID.
+Different from existing reconstruction-based methods, we pro-
+pose a Component Reconstruction Disentanglement (CRD)
+module to disentangle the clothes-irrelevant features and the
+clothes-relevant features in a controllable manner. We also
+propose a Deep Assembled Disentanglement (DAD) module
+to further improve the discriminativeness of the disentangled
+features in CRD, avoiding the spoiling of the most discrimina-
+tive clothes-irrelevant information. For inference, we directly
+remove the clothes-relevant features for controllable disentan-
+glement. Extensive experiments on three real-world bench-
+mark CC-ReID datasets demonstrate the effectiveness of the
+proposed DCR-ReID.
+In the future, DCR-ReID still has some room for improve-
+ment. First, the reconstructed contour map in CR branch
+will inevitably brings tiny noises, such as contours of the
+background. It is necessary to extract more accurate contour
+maps of the person for better reconstruction of the con-
+tour features. Second, Existing Re-ID methods mainly utilize
+images to extract discriminative features. However, multi-
+modal data contains more complementary discriminative infor-
+mation. Therefore, we intend to explore effective methods to
+fuse these data, and hope to improve the ability to disentangle
+and extract discriminative features in more complex scenarios.
+Authorized licensed use limited to: AMRITA VISHWA VIDYAPEETHAM AMRITA SCHOOL OF ENGINEERING. Downloaded on July 23,2026 at 04:52:15 UTC from IEEE Xplore.  Restrictions apply. 

@@ -1,0 +1,83 @@
+{
+  "project": "Lightweight Person Re-Identification Model (DCR-ReID)",
+  "audit_date": "2026-10-27T11:26:00+05:30",
+  "dataset_manifest_summary": {
+    "both_small": {
+      "surveillance_condition": "Combined Small Benchmark (Market-1501)",
+      "num_train_pids": 250,
+      "num_train_imgs": 2919,
+      "num_query_imgs": 475,
+      "num_query_pids": 250,
+      "valid_cross_camera_queries": 457,
+      "num_gallery_imgs": 2146,
+      "num_gallery_pids": 250,
+      "true_identity_leakage": 0
+    },
+    "with_bag": {
+      "surveillance_condition": "Person with Bag / Accessory Occlusion",
+      "num_train_pids": 82,
+      "num_train_imgs": 1157,
+      "num_query_imgs": 322,
+      "num_query_pids": 82,
+      "valid_cross_camera_queries": 318,
+      "num_gallery_imgs": 1131,
+      "num_gallery_pids": 82,
+      "true_identity_leakage": 0
+    },
+    "without_bag": {
+      "surveillance_condition": "Person without Bag (Unoccluded Apparel)",
+      "num_train_pids": 169,
+      "num_train_imgs": 1770,
+      "num_query_imgs": 179,
+      "num_query_pids": 167,
+      "valid_cross_camera_queries": 155,
+      "num_gallery_imgs": 986,
+      "num_gallery_pids": 167,
+      "true_identity_leakage": 0
+    },
+    "both_large": {
+      "surveillance_condition": "Full-Scale Surveillance Benchmark (Market-1501)",
+      "num_train_pids": 250,
+      "num_train_imgs": 11719,
+      "num_query_imgs": 1265,
+      "num_query_pids": 250,
+      "valid_cross_camera_queries": 1244,
+      "num_gallery_imgs": 10048,
+      "num_gallery_pids": 250,
+      "true_identity_leakage": 0
+    },
+    "prcc_cc": {
+      "surveillance_condition": "PRCC Cloth-Changing (Query: Cam A -> Gallery: Cam C)",
+      "num_train_pids": 150,
+      "num_train_imgs": 17896,
+      "num_query_imgs": 3384,
+      "num_query_pids": 71,
+      "valid_cross_camera_queries": 3384,
+      "num_gallery_imgs": 3543,
+      "num_gallery_pids": 71,
+      "true_identity_leakage": 0
+    },
+    "prcc_sc": {
+      "surveillance_condition": "PRCC Same-Clothes (Query: Cam A -> Gallery: Cam B)",
+      "num_train_pids": 150,
+      "num_train_imgs": 17896,
+      "num_query_imgs": 3384,
+      "num_query_pids": 71,
+      "valid_cross_camera_queries": 3384,
+      "num_gallery_imgs": 3873,
+      "num_gallery_pids": 71,
+      "true_identity_leakage": 0
+    },
+    "prcc_all": {
+      "surveillance_condition": "PRCC Combined Benchmark (Query: Cam A -> Gallery: Cam B + Cam C)",
+      "num_train_pids": 150,
+      "num_train_imgs": 17896,
+      "num_query_imgs": 3384,
+      "num_query_pids": 71,
+      "valid_cross_camera_queries": 3384,
+      "num_gallery_imgs": 7416,
+      "num_gallery_pids": 71,
+      "true_identity_leakage": 0
+    }
+  }
+}
