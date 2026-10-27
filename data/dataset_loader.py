@@ -1,6 +1,7 @@
 import os
 import re
 import glob
+from collections import defaultdict
 from PIL import Image
 try:
     import torch
@@ -145,6 +146,15 @@ class PersonReIDDataset:
 
         pid2label = {pid: label for label, pid in enumerate(sorted(pid_container))}
 
+        # Check minimum camera index in dataset
+        min_cam = 100
+        for img_path in img_paths:
+            fname = os.path.basename(img_path)
+            res = pattern.search(fname)
+            if res:
+                _, c_val = map(int, res.groups())
+                min_cam = min(min_cam, c_val)
+
         data = []
         for img_path in img_paths:
             fname = os.path.basename(img_path)
@@ -155,7 +165,8 @@ class PersonReIDDataset:
                     continue  # junk images
                 assert 0 <= pid <= 9999
                 assert 0 <= camid <= 10
-                camid -= 1  # 0-indexed
+                if min_cam > 0:
+                    camid -= 1  # 0-indexed if starting from 1
                 if relabel:
                     pid = pid2label[pid]
                 data.append((img_path, pid, camid))
@@ -219,16 +230,116 @@ def build_transforms(height=256, width=128, is_train=True):
     return transform
 
 
-def get_dataloaders(data_dir, dataset_type='both_small', batch_size=32, num_workers=0):
+import copy
+import numpy as np
+
+class RandomIdentitySampler:
+    """
+    Random Identity (P x K) Sampler for Person Re-ID.
+    Randomly samples P identities, and K instances per identity,
+    forming a batch of P * K samples.
+    Ensures that every selected identity has K samples in the batch.
+    """
+    def __init__(self, data_source, batch_size=16, num_instances=4, seed=None):
+        self.data_source = data_source
+        self.batch_size = batch_size
+        self.num_instances = num_instances
+        self.num_pids_per_batch = batch_size // num_instances
+        self.seed = seed
+        self.rng = np.random.RandomState(seed) if seed is not None else np.random
+
+        self.index_dic = defaultdict(list)
+        for index, (_, pid, _) in enumerate(data_source):
+            self.index_dic[pid].append(index)
+        self.pids = sorted(list(self.index_dic.keys()))
+
+        # Estimate epoch length
+        self.length = 0
+        for pid in self.pids:
+            num = len(self.index_dic[pid])
+            if num < self.num_instances:
+                num = self.num_instances
+            self.length += num - num % self.num_instances
+
+    def __iter__(self):
+        batch_idxs_dict = defaultdict(list)
+        for pid in self.pids:
+            idxs = copy.deepcopy(self.index_dic[pid])
+            if len(idxs) < self.num_instances:
+                idxs = self.rng.choice(idxs, size=self.num_instances, replace=True).tolist()
+            else:
+                self.rng.shuffle(idxs)
+            batch_idxs = []
+            for idx in idxs:
+                batch_idxs.append(idx)
+                if len(batch_idxs) == self.num_instances:
+                    batch_idxs_dict[pid].append(batch_idxs)
+                    batch_idxs = []
+
+        avai_pids = copy.deepcopy(self.pids)
+        final_idxs = []
+
+        while len(avai_pids) >= self.num_pids_per_batch:
+            selected_pids = self.rng.choice(avai_pids, self.num_pids_per_batch, replace=False).tolist()
+            for pid in selected_pids:
+                batch_idxs = batch_idxs_dict[pid].pop(0)
+                final_idxs.extend(batch_idxs)
+                if len(batch_idxs_dict[pid]) == 0:
+                    avai_pids.remove(pid)
+
+        return iter(final_idxs)
+
+    def __len__(self):
+        return self.length
+
+
+def generate_clothing_labels(pids, cams, is_prcc=True, num_clothes=100):
+    """
+    Generates validated clothing condition labels.
+    For PRCC:
+      - Camera A (camid=0): same-clothes condition -> clothing index 0
+      - Camera B (camid=1): same-clothes condition -> clothing index 0
+      - Camera C (camid=2): cloth-changing condition -> clothing index 1
+      Formula: clothes_label = (pid * 2 + clothes_condition) % num_clothes
+      where clothes_condition is 0 for Cams A/B, and 1 for Cam C.
+      Explicit validation: cams not in {0, 1, 2} raises ValueError.
+    For Market-1501:
+      - Viewpoint/camera condition mapping: (cams % 2)
+    """
+    if is_prcc:
+        # Validate camera IDs
+        invalid_mask = (cams < 0) | (cams > 2)
+        if invalid_mask.any():
+            invalid_cams = cams[invalid_mask].tolist()
+            raise ValueError(f"Invalid PRCC camera ID detected: {invalid_cams}. PRCC only supports cameras 0 (A), 1 (B), and 2 (C).")
+        
+        # Explicit mapping: 0 for Cam A (0) and B (1); 1 for Cam C (2)
+        clothes_condition = (cams == 2).long()
+        clothes_labels = (pids * 2 + clothes_condition) % num_clothes
+    else:
+        clothes_labels = (pids * 2 + (cams % 2)).long() % num_clothes
+        
+    return clothes_labels
+
+
+def get_dataloaders(data_dir, dataset_type='both_small', batch_size=32, num_workers=0, use_pk_sampler=False, num_instances=4):
     dataset = PersonReIDDataset(data_dir=data_dir, dataset_type=dataset_type)
 
     transform_train = build_transforms(is_train=True)
     transform_test = build_transforms(is_train=False)
 
-    train_loader = DataLoader(
-        ImageDataset(dataset.train_samples, transform=transform_train),
-        batch_size=batch_size, shuffle=True, num_workers=num_workers, drop_last=True
-    )
+    if use_pk_sampler:
+        sampler = RandomIdentitySampler(dataset.train_samples, batch_size=batch_size, num_instances=num_instances)
+        train_loader = DataLoader(
+            ImageDataset(dataset.train_samples, transform=transform_train),
+            batch_size=batch_size, sampler=sampler, num_workers=num_workers, drop_last=True
+        )
+    else:
+        train_loader = DataLoader(
+            ImageDataset(dataset.train_samples, transform=transform_train),
+            batch_size=batch_size, shuffle=True, num_workers=num_workers, drop_last=True
+        )
+
     query_loader = DataLoader(
         ImageDataset(dataset.query_samples, transform=transform_test),
         batch_size=batch_size, shuffle=False, num_workers=num_workers
