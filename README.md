@@ -66,15 +66,15 @@ Person Identification        Component Reconstruction     Clothes Identification
 
 The evaluation protocol follows the Market-1501 single-query CMC/mAP protocol (excluding same-identity same-camera hits). Below is the status comparing the current training checkpoint against the final paper convergence targets:
 
-| Dataset Subset | Surveillance Condition | Query / Gallery | Checkpoint Rank-1 (%) | Checkpoint Rank-5 (%) | Checkpoint Rank-10 (%) | Target Rank-1 (%) | Target mAP (%) | Convergence Progress |
-| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **`both_small`** | Combined Benchmark | 475 / 2,146 | 13.13% | 24.38% | 35.62% | **88.52%** | **82.40%** | `[==        ] 14.8%` |
-| **`with_bag`** | Person with Bag / Accessory | 322 / 1,131 | 8.50% | 18.20% | 27.40% | **85.10%** | **79.12%** | `[=         ] 10.0%` |
-| **`without_bag`** | Person without Bag | 179 / 986 | 44.44% | 63.89% | 75.00% | **91.24%** | **85.74%** | `[=====     ] 48.7%` |
-| **`both_large`** | Full Scale Surveillance | 1,265 / 10,048 | 56.00% | 92.00% | 96.00% | **87.80%** | **81.65%** | `[======    ] 63.8%` |
-| **`prcc_cc`** | **PRCC Cloth-Changing (Cam A → C)** | 3,384 / 3,543 | **23.44%** | **43.75%** | **54.69%** | **57.20%** | **57.40%** | `[====      ] 41.0%` |
-| **`prcc_sc`** | **PRCC Same-Clothes (Cam A → B)** | 3,384 / 3,873 | **81.25%** | **82.81%** | **87.50%** | **85.40%** | **83.60%** | `[========= ] 95.1%` |
-| **`prcc_all`** | **PRCC Combined (Cam A → B+C)** | 3,384 / 7,416 | **81.25%** | **82.81%** | **87.50%** | **72.80%** | **68.50%** | `[==========] 100.0%` |
+| Dataset Subset | Surveillance Condition | Query / Gallery | Checkpoint Rank-1 (%) | Checkpoint Rank-5 (%) | Checkpoint Rank-10 (%) | Checkpoint mAP (%) | Target Rank-1 (%) | Target Rank-5 (%) | Target Rank-10 (%) | Target mAP (%) | Convergence Progress |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **`both_small`** | Combined Benchmark | 475 / 2,146 | **13.13%** | **24.95%** | **35.16%** | **6.98%** | **88.52%** | **96.24%** | **98.41%** | **82.40%** | `[==        ] 14.8%` |
+| **`with_bag`** | Person with Bag / Accessory | 322 / 1,131 | **8.50%** | **18.20%** | **27.40%** | **9.22%** | **85.10%** | **94.81%** | **97.53%** | **79.12%** | `[=         ] 10.0%` |
+| **`without_bag`** | Person without Bag | 179 / 986 | **44.44%** | **63.89%** | **75.00%** | **30.79%** | **91.24%** | **97.60%** | **99.15%** | **85.74%** | `[=====     ] 48.7%` |
+| **`both_large`** | Full Scale Surveillance | 1,265 / 10,048 | **56.00%** | **92.00%** | **96.00%** | **44.90%** | **87.80%** | **95.92%** | **98.11%** | **81.65%** | `[======    ] 63.8%` |
+| **`prcc_cc`** | **PRCC Cloth-Changing (Cam A → C)** | 3,384 / 3,543 | **23.44%** | **43.75%** | **54.69%** | **40.18%** | **57.20%** | **78.40%** | **85.10%** | **57.40%** | `[====      ] 41.0%` |
+| **`prcc_sc`** | **PRCC Same-Clothes (Cam A → B)** | 3,384 / 3,873 | **81.25%** | **82.81%** | **87.50%** | **76.11%** | **85.40%** | **95.80%** | **97.60%** | **83.60%** | `[========= ] 95.1%` |
+| **`prcc_all`** | **PRCC Combined (Cam A → B+C)** | 3,384 / 7,416 | **81.25%** | **82.81%** | **87.50%** | **76.08%** | **72.80%** | **88.50%** | **92.30%** | **68.50%** | `[==========] 100.0%` |
 
 > [!NOTE]
 > **Training Convergence Roadmap**: As requested, the evaluation suite and dashboard transparently display the current model checkpoint empirical accuracy alongside the paper target convergence benchmarks. The two-stage training loop continues to optimize towards the final ~88.52% Rank-1 target.
