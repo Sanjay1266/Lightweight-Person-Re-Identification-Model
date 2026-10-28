@@ -74,3 +74,4 @@ $$\mathcal{L}_{\text{total}} = \mathcal{L}_{ID} + \mathcal{L}_{\text{triplet}} +
    Smooths clothing prediction distribution across same-identity samples to eliminate clothing bias from the invariant identity representations.
 
 Gradient propagation passes cleanly to all sub-modules (Stem, Stages 1-4, CRD Projections, CRD Decoders, DAD Attention, and Dual BNNeck).
+
