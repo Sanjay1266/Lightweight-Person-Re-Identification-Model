@@ -1,0 +1,104 @@
+{
+  "datasets": {
+    "PRCC": {
+      "official_benchmark": true,
+      "reference_paper": "Yang et al., TPAMI 2021; Cui et al., IEEE TCSVT 2023",
+      "total_identities": 221,
+      "train_identities": 150,
+      "test_identities": 71,
+      "total_images": 28696,
+      "train_images": 17896,
+      "test_images": 10800,
+      "cameras": {
+        "A": {"camid": 0, "role": "query", "clothing_condition": "Outfit 1", "images": 3384},
+        "B": {"camid": 1, "role": "gallery_sc", "clothing_condition": "Outfit 1 (Same Clothes)", "images": 3873},
+        "C": {"camid": 2, "role": "gallery_cc", "clothing_condition": "Outfit 2 (Cloth Changing)", "images": 3543}
+      },
+      "evaluation_protocols": {
+        "prcc_cc": {"query_cam": "A", "gallery_cam": "C", "query_count": 3384, "gallery_count": 3543, "type": "Cloth-Changing (CC)"},
+        "prcc_sc": {"query_cam": "A", "gallery_cam": "B", "query_count": 3384, "gallery_count": 3873, "type": "Same-Clothes (SC)"},
+        "prcc_all": {"query_cam": "A", "gallery_cams": ["B", "C"], "query_count": 3384, "gallery_count": 7416, "type": "Combined (General)"}
+      },
+      "leakage_check": {
+        "train_test_pid_overlap": 0,
+        "status": "STRICTLY_DISJOINT"
+      }
+    },
+    "LTCC": {
+      "official_benchmark": true,
+      "reference_paper": "Qian et al., ACCV 2020",
+      "total_identities": 152,
+      "total_images": 17119,
+      "cameras": 12,
+      "clothing_changes_per_person": "Up to 14 suits",
+      "evaluation_protocols": ["General (SC + CC)", "Cloth-Changing (CC)"],
+      "status_in_repo": "Not bundled locally (PRCC is the primary CC-ReID benchmark available)"
+    },
+    "CCVID": {
+      "official_benchmark": true,
+      "reference_paper": "Gu et al., CVPR 2022",
+      "total_identities": 226,
+      "total_sequences": 2856,
+      "total_images": 347833,
+      "clothing_changes_per_person": "2 to 5 suits",
+      "evaluation_protocols": ["General", "Cloth-Changing (CC)"],
+      "status_in_repo": "Not bundled locally (Video benchmark)"
+    },
+    "both_small": {
+      "official_benchmark": false,
+      "dataset_family": "Market-1501 Format Surveillance Split",
+      "train_identities": 250,
+      "train_images": 2919,
+      "gallery_images": 2146,
+      "query_images": 475,
+      "valid_queries": 457,
+      "evaluation_protocol": "Market-1501 single-query with same-camera exclusion",
+      "leakage_check": {
+        "train_test_pid_overlap": 0,
+        "status": "STRICTLY_DISJOINT"
+      }
+    },
+    "with_bag": {
+      "official_benchmark": false,
+      "dataset_family": "Market-1501 Accessory/Bag Occlusion Split",
+      "train_identities": 82,
+      "train_images": 1157,
+      "gallery_images": 1131,
+      "query_images": 322,
+      "valid_queries": 318,
+      "evaluation_protocol": "Market-1501 single-query with same-camera exclusion",
+      "leakage_check": {
+        "train_test_pid_overlap": 0,
+        "status": "STRICTLY_DISJOINT"
+      }
+    },
+    "without_bag": {
+      "official_benchmark": false,
+      "dataset_family": "Market-1501 Clean Silhouette Split",
+      "train_identities": 169,
+      "train_images": 1770,
+      "gallery_images": 986,
+      "query_images": 179,
+      "valid_queries": 155,
+      "evaluation_protocol": "Market-1501 single-query with same-camera exclusion",
+      "leakage_check": {
+        "train_test_pid_overlap": 0,
+        "status": "STRICTLY_DISJOINT"
+      }
+    },
+    "both_large": {
+      "official_benchmark": false,
+      "dataset_family": "Market-1501 Large Surveillance Split",
+      "train_identities": 250,
+      "train_images": 11719,
+      "gallery_images": 10048,
+      "query_images": 1265,
+      "valid_queries": 1244,
+      "evaluation_protocol": "Market-1501 single-query with same-camera exclusion",
+      "leakage_check": {
+        "train_test_pid_overlap": 0,
+        "status": "STRICTLY_DISJOINT"
+      }
+    }
+  }
+}
