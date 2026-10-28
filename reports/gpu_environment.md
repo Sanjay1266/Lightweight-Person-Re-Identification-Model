@@ -1,6 +1,6 @@
 # GPU Environment Verification Report
 
-### Course: 23CSE373 - Computer Vision | Date: 2026-10-27 12:55:09
+### Course: 23CSE373 - Computer Vision | Date: 2026-10-28 20:23:57
 **Project**: Lightweight Person Re-Identification Model (DCR-ReID)  
 **Host System**: Windows 11 | Isolated Environment: `.venv_cuda`
 
@@ -40,7 +40,7 @@
 | **Tensor Allocation & Math** | 1000x1000 Matrix Multiplication on CUDA | **PASSED** |
 | **Model Forward Pass** | Lightweight DCR-ReID batch forward on CUDA | **PASSED** |
 | **Multi-Loss Computation** | $L_{ID} + L_{triplet} + L_c + L_{ca} + L_R$ on CUDA | **PASSED** |
-| **Backward Pass & Gradients**| Backprop to stem, CRD, DAD; Grad Norm: `103.8025` | **PASSED** |
+| **Backward Pass & Gradients**| Backprop to stem, CRD, DAD; Grad Norm: `94.4032` | **PASSED** |
 | **Loss Numerical Stability** | Zero NaN / Zero Inf across all loss heads | **PASSED** |
 | **Peak VRAM (Smoke Test)** | `154.12 MB` (0.151 GB / 8 GB VRAM) | **PASSED (< 5% VRAM)** |
 

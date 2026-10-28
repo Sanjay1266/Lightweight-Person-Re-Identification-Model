@@ -1,0 +1,98 @@
+{
+  "benchmark_timestamp": "2026-10-28T20:22:05+05:30",
+  "evaluation_mode": "FAST",
+  "command": "python evaluate.py --fast",
+  "seed": 42,
+  "max_query": 64,
+  "max_gallery": 224,
+  "environment": {
+    "python_version": "3.14.3",
+    "python_executable": "C:\\Program Files\\PyManager\\python.exe",
+    "torch_version": "2.13.0+cpu",
+    "torch_cuda_version": null,
+    "device_policy": "auto",
+    "resolved_device": "cpu"
+  },
+  "checkpoint": {
+    "path": "checkpoints/best_model.pth",
+    "sha256": "e5bfb5aa627fc3a10f27c01d03bdb54ba8cda06cb3453d24484cd8142e034730",
+    "identity_classes": 150,
+    "clothing_classes": 100,
+    "matched_tensors": 162,
+    "total_tensors": 162
+  },
+  "model_specifications": {
+    "architecture": "LightweightDCRReID",
+    "total_params": 9752277,
+    "backbone_params": 4901376,
+    "crd_params": 4165315,
+    "dad_params": 557376,
+    "neck_params": 128210,
+    "embedding_dim": 512,
+    "flops_g": 3.0015,
+    "macs_g": 1.5008,
+    "cpu_latency_single_image_median_ms": 33.01,
+    "cpu_latency_single_image_mean_ms": 33.73,
+    "cpu_latency_single_image_p95_ms": 38.69,
+    "cpu_fps_single_image": 30.3,
+    "cpu_fps_batch_32": 43.5
+  },
+  "subsets": {
+    "both_small": {
+      "num_query": 64,
+      "num_gallery": 224,
+      "rank1": 18.18,
+      "rank5": 30.91,
+      "rank10": 40.00,
+      "mAP": 22.24
+    },
+    "with_bag": {
+      "num_query": 64,
+      "num_gallery": 224,
+      "rank1": 11.48,
+      "rank5": 21.31,
+      "rank10": 27.87,
+      "mAP": 10.25
+    },
+    "without_bag": {
+      "num_query": 64,
+      "num_gallery": 224,
+      "rank1": 29.82,
+      "rank5": 52.63,
+      "rank10": 70.18,
+      "mAP": 30.71
+    },
+    "both_large": {
+      "num_query": 64,
+      "num_gallery": 224,
+      "rank1": 22.41,
+      "rank5": 41.38,
+      "rank10": 48.28,
+      "mAP": 26.87
+    },
+    "prcc_cc": {
+      "num_query": 64,
+      "num_gallery": 224,
+      "rank1": 3.12,
+      "rank5": 9.38,
+      "rank10": 14.06,
+      "mAP": 5.84
+    },
+    "prcc_sc": {
+      "num_query": 64,
+      "num_gallery": 224,
+      "rank1": 4.69,
+      "rank5": 9.38,
+      "rank10": 12.50,
+      "mAP": 7.96
+    },
+    "prcc_all": {
+      "num_query": 64,
+      "num_gallery": 224,
+      "rank1": 3.12,
+      "rank5": 10.94,
+      "rank10": 15.62,
+      "mAP": 5.67
+    }
+  }
+}

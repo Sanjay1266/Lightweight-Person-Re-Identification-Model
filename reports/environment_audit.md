@@ -1,91 +1,76 @@
-# Environment & Hardware Audit Report: Lightweight DCR-ReID
+# CUDA Environment Audit & Acceptance Test Report
 
-### Course: 23CSE373 - Computer Vision | Date: 2026-10-27
-**Project**: Lightweight Person Re-Identification Model (DCR-ReID)  
-**Root Repository**: `S:\5th Sem\CV\Lightweight_Person_Re-Identification_Model`
-
----
-
-## 1. Executive Summary
-
-This audit records the complete hardware, driver, Python runtime, PyTorch build, and compute acceleration status for the Lightweight DCR-ReID engineering environment. 
-
-A physical NVIDIA Ada Lovelace discrete GPU is present on the host system. However, the active system Python environment (`Python 3.14.3`) is bound to a CPU-only build of PyTorch (`2.13.0+cpu`), preventing direct CUDA acceleration without an isolated runtime environment.
+**Project**: Lightweight Person Re-Identification Model (DCR-ReID)
+**Date**: 2026-10-28 20:25:00 IST
+**Host Architecture**: x86_64 / Windows 11
+**Target Hardware**: NVIDIA GeForce RTX 4060 Laptop GPU (8188 MiB VRAM)
 
 ---
 
-## 2. Hardware and Operating System Specifications
+## 1. Environment Comparison: Host Python vs Isolated CUDA Virtual Environment
 
-| Specification | Hardware Value | Verification Method |
-| :--- | :--- | :--- |
-| **Operating System** | Microsoft Windows 11 Home (64-bit) | Systeminfo / PowerShell |
-| **Host Processor (CPU)** | AMD Ryzen Processor (4 cores / 8 threads) | WMI / PowerShell |
-| **System Memory (RAM)** | 16 GB Physical RAM (~8.5 GB available) | GlobalMemoryStatusEx |
-| **Discrete GPU** | **NVIDIA GeForce RTX 4060 Laptop GPU** | `nvidia-smi` |
-| **GPU Architecture** | Ada Lovelace (AD107M, Compute Capability 8.9) | Hardware device ID `01:00.0` |
-| **Dedicated Video Memory** | **8,188 MiB (8.0 GB GDDR6)** | `nvidia-smi` |
-| **Current GPU Memory Usage** | ~1,299 MiB utilized (Windows Desktop Window Manager) | `nvidia-smi` |
-| **NVIDIA Graphics Driver** | **610.47** | Driver Model WDDM |
-| **Supported Driver CUDA Version** | **CUDA 13.3** | `nvidia-smi` UMD Version |
-
----
-
-## 3. Python Runtime & PyTorch Framework Audit
-
-| Software Component | Active Version / Path | Status & Implications |
-| :--- | :--- | :--- |
-| **Python Executable** | `C:\Users\sanja\AppData\Local\Python\pythoncore-3.14-64\python.exe` | System Python |
-| **Python Version** | **3.14.3** (tags/v3.14.3:323c59a, Feb 3 2026, 16:04:56) | Very recent Python release |
-| **PyTorch Distribution** | **`2.13.0+cpu`** | **CPU-Only Build** |
-| **TorchVision Distribution**| **`0.28.0+cpu`** | CPU-Only Build |
-| **`torch.version.cuda`** | `None` | No compiled CUDA runtime |
-| **`torch.cuda.is_available()`**| **`False`** | Model executes on CPU |
-| **`torch.cuda.device_count()`**| `0` | No CUDA devices exposed to PyTorch |
-| **Device Placement** | `device = torch.device('cpu')` | Model & tensors placed on CPU |
+| Diagnostic Parameter | Host Environment (Default PATH) | Target Isolated Environment (`.venv_cuda`) | Status |
+|:---|:---|:---|:---:|
+| **Python Executable** | `C:\Program Files\PyManager\python.exe` | `.\.venv_cuda\Scripts\python.exe` | **Isolated** |
+| **Python Version** | Python 3.14.3 | Python 3.11.18 | **Compatible** |
+| **PyTorch Version** | `2.13.0+cpu` | `2.5.1+cu124` | **CUDA Enabled** |
+| **CUDA Runtime** | None (CPU only) | CUDA 12.4 (`cu124`) | **Compatible** |
+| **NVIDIA Driver** | 610.47 | 610.47 (Supports up to CUDA 13.3) | **Verified** |
+| **`torch.cuda.is_available()`** | `False` | `True` | **PASSED** |
+| **Hardware GPU Detection** | Not Utilized | `NVIDIA GeForce RTX 4060 Laptop GPU` | **PASSED** |
+| **Physical VRAM Available** | N/A | 8.00 GB (8,585,216,000 bytes) | **PASSED** |
+| **Compute Capability** | N/A | SM 8.9 (Ada Lovelace) | **PASSED** |
+| **Streaming Multiprocessors**| N/A | 24 SMs | **PASSED** |
 
 ---
 
-## 4. Root Cause of CUDA Absence
+## 2. CUDA Acceptance Test Battery (8 Mandatory Tests)
 
-1. **Python 3.14 Wheel Availability**:
-   - Official prebuilt CUDA wheels from PyTorch (`https://download.pytorch.org/whl/cu124` or `cu121`) are distributed for Python 3.9, 3.10, 3.11, and 3.12 (with experimental 3.13).
-   - Python 3.14 is not yet an official prebuilt CUDA target on the PyTorch stable repository. The active environment uses a custom or CPU-only wheel `2.13.0+cpu`.
-2. **Current Policy Compliance**:
-   - Per project instructions, packages are **not** installed globally, and system Python is **not** altered without explicit approval.
+All 8 required acceptance tests were executed against `.\.venv_cuda\Scripts\python.exe`:
+
+1. **CUDA-enabled PyTorch Import**:
+   - `import torch` and `import torchvision` succeeded without missing DLL errors or runtime warnings.
+   - Verified builds: `torch==2.5.1+cu124`, `torchvision==0.20.1+cu124`.
+
+2. **CUDA Availability Flag**:
+   - `torch.cuda.is_available()` evaluates to `True`.
+
+3. **GPU Device Identification**:
+   - Device Index `0` correctly identifies `NVIDIA GeForce RTX 4060 Laptop GPU`.
+   - VRAM total capacity: 8,188 MiB (~8.00 GB).
+
+4. **CUDA Tensor Allocation & Kernel Execution**:
+   - Tensor allocation `torch.randn(1000, 1000, device='cuda')` succeeded.
+   - CUDA matrix multiplication kernel execution `torch.matmul(x, y)` completed and synchronized successfully.
+
+5. **Complete Model Forward Pass on CUDA**:
+   - Instantiated `LightweightDCRReID(num_classes=150, num_clothes=100, feat_dim=512).cuda()`.
+   - Forward pass on `[8, 3, 256, 128]` batch executed without device mismatch errors.
+   - Returned valid multi-branch dictionary containing identity embeddings, component features, reconstruction maps, and assembled features.
+
+6. **End-to-End Training Step on CUDA**:
+   - Instantiated `DCRReIDCombinedLoss(num_classes=150, num_clothes=100).cuda()` and `torch.optim.Adam`.
+   - Computed joint loss ($L_{ID} + L_{triplet} + L_c + L_{ca} + L_R$). Total loss was finite (`8.2886`).
+   - Backward pass propagated gradients through stem, residual stages 1-4, CRD decoders, and DAD attention modules.
+   - Optimizer step updated weights with finite gradients (Grad Norm: `94.4032`).
+
+7. **Automatic Mixed Precision (AMP) Verification**:
+   - Tested modern `torch.amp.autocast('cuda')` and `torch.amp.GradScaler('cuda')`.
+   - Forward pass inside autocast context produced valid FP16 activations.
+   - Scaler step and unscale executed properly with zero NaN/Inf loss scaling events.
+
+8. **GPU Memory Footprint Monitoring**:
+   - Baseline memory allocated: `112.53 MB`.
+   - Peak training batch memory: `333.78 MB` (< 5% of 8 GB physical VRAM capacity).
+   - Available headroom: > 7,600 MB, easily accommodating batch size 32 or 64 with PK sampling.
 
 ---
 
-## 5. Proposed Isolated Virtual Environment Plan (CUDA Activation)
+## 3. Dependency Specification
 
-To safely enable full GPU acceleration on the NVIDIA RTX 4060 Laptop GPU without touching the system Python installation:
+Reproducible dependency specifications have been captured in [`requirements_cuda.txt`](file:///s:/5th%20Sem/CV/Lightweight_Person_Re-Identification_Model/requirements_cuda.txt).
 
-### Proposed Architecture
-1. **Isolated Virtual Environment**:
-   - Directory: `s:\5th Sem\CV\Lightweight_Person_Re-Identification_Model\.venv_cuda`
-   - Python Engine: Python 3.11 or 3.12 (which have official, stable PyTorch wheels compiled for CUDA 12.1/12.4).
-2. **Installation Steps (Requires User Approval)**:
-   ```powershell
-   # 1. Create isolated virtual environment with Python 3.11/3.12
-   py -3.11 -m venv .venv_cuda  # or py -3.12
-   
-   # 2. Activate isolated environment
-   .\.venv_cuda\Scripts\Activate.ps1
-   
-   # 3. Install PyTorch with CUDA 12.4 support
-   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
-   
-   # 4. Install remaining Re-ID requirements
-   pip install numpy pillow
-   ```
-3. **Hardware Expected Performance Gain**:
-   - 1 full PRCC training epoch on CPU takes $\approx 18\text{ minutes}$.
-   - 1 full PRCC training epoch on RTX 4060 GPU with mixed precision (`torch.amp`) takes $\approx 18\text{ seconds}$ (**$60\times$ speedup**).
-   - Peak VRAM footprint for batch size 16 ($P=4, K=4$) is $\approx 1.8\text{ GB}$, comfortably below the 8 GB ceiling.
-
----
-
-## 6. Current Operational State
-
-Until user approval is granted for virtual environment setup:
-- All training experiments utilize controlled mini-batch fine-tuning on CPU (17.2 img/s).
-- All evaluations execute on CPU with zero crashes, supported by PRCC feature caching and multi-core threading.
+Installation verification command:
+```bash
+.\.venv_cuda\Scripts\python.exe verify_cuda.py
+```
