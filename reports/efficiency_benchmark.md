@@ -81,3 +81,4 @@ Measured via `torch.cuda.max_memory_allocated()` during high-throughput batched 
 > 6. **Gallery Index Search**: Cosine similarity matching against enrolled gallery identities (~0.5–2 ms).
 >
 > Lightweight DCR-ReID's 0.37 ms amortized extraction ensures that the Re-ID module never constitutes the system bottleneck.
+
