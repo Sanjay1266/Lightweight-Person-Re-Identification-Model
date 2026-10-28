@@ -1,7 +1,7 @@
 # Lightweight Person Re-Identification Model (DCR-ReID)
 ### 23CSE373 - Computer Vision | Amrita School of Engineering
 
-A high-performance, lightweight Computer Vision system implementing **Deep Component Reconstruction for Cloth-Changing and Accessory Person Re-Identification (DCR-ReID)** based on the IEEE TCSVT 2023 research paper. Designed for real-time edge surveillance deployment, the framework disentangles identity-invariant representations from transient clothes/accessory appearance variations (clothing changes, handbags, backpacks).
+A high-performance, lightweight Computer Vision system implementing **Deep Component Reconstruction for Cloth-Changing and Accessory Person Re-Identification (DCR-ReID)** based on the IEEE TCSVT 2023 research paper. Designed for edge surveillance deployment, the framework disentangles identity-invariant biometric representations from transient clothes and accessory variations (clothing changes, handbags, backpacks).
 
 ---
 
@@ -15,12 +15,12 @@ A high-performance, lightweight Computer Vision system implementing **Deep Compo
 
 ---
 
-## 🌟 Full DCR-ReID Paper Architecture & Key Modules
+## 🌟 Full DCR-ReID Architecture & Key Modules
 
-The framework implements the three coordinated branches formulated in Section III of the base paper:
+The framework implements three coordinated branches formulated in Section III of the base paper:
 
 ```
-                            Input Image (256x128)
+                            Input Image (256×128)
                                      ↓
                     Lightweight Residual Backbone (P_i)
                                      ↓
@@ -28,67 +28,89 @@ The framework implements the three coordinated branches formulated in Section II
         ↓                            ↓                            ↓
 [PI Branch]                   [CR Branch]                  [CI Branch]
 Person Identification        Component Reconstruction     Clothes Identification
-  ├── Global Pooling           ├── Channel Decomp (Eq. 8)   ├── Clothes Classifier C_P
-  ├── BNNeck & L_ID, L_trip        P_i = P⁺ ⊕ P⁻ ⊕ Pᵗ       ├── Adversarial Loss L_ca
+  ├── Global Avg Pooling       ├── Channel Decomp (Eq. 8)   ├── Clothes Classifier C_P
+  ├── Dual BNNeck & Metric         P_i = P⁺ ⊕ P⁻ ⊕ Pᵗ       ├── Adversarial Loss L_ca
   └── Invariant Inference:     ├── 4-Block Decoders ψ^v     ├── DAD Feature Assembly:
       Discards F⁻ (clothes)    └── L1 Recon Loss L_R (Eq.10)    G_i = F⁺ ⊕ F_ai⁻ ⊕ Fᵗ
                                                             └── Dual Attention (CA + SA)
 ```
 
 ### 1. Person Identification (PI) Branch
-- Deep feature extraction $P_i \in \mathbb{R}^{B \times C \times H \times W}$ via a lightweight residual backbone (~3.24M parameters).
-- Metric learning with **Label-Smoothed Cross-Entropy Loss** ($\epsilon=0.1$, Eq. 5-6) and **Hard-Mining Triplet Loss** ($\text{margin}=0.3$).
+- Deep spatial feature extraction $P_i \in \mathbb{R}^{B \times 512 \times 16 \times 8}$ via a lightweight residual backbone (~4.90M parameters) using stride-1 Stage 4 to preserve spatial resolution for component decoders.
+- Metric learning with **Label-Smoothed Cross-Entropy Loss** ($\epsilon=0.1$, Eq. 5-6) and **Batch-Hard Triplet Ranking Loss** ($\text{margin}=0.3$).
 - **Cloth-Changing Invariant Inference**: Discards transient clothes-relevant features $F_i^-$ during inference, relying strictly on body shape and contour cues ($F_i^+ \oplus F_i^t$) to prevent clothing bias.
 
 ### 2. Component Reconstruction (CR) Branch
-- **Controllable Channel Decomposition** (Eq. 8):
+- **Channel Decomposition** (Eq. 8):
   $$P_i = P_i^- \oplus P_i^+ \oplus P_i^t$$
   - $P_i^-$: Clothes-relevant representations (shirt, pants, apparel color, bag accessories)
   - $P_i^+$: Clothes-irrelevant representations (body shape, facial landmarks, anatomical proportions)
-  - $P_i^t$: Human contour/boundary representations
+  - $P_i^t$: Human silhouette contour/boundary representations
 - **4-Block Component Decoders** ($\psi^-, \psi^+, \psi^t$, Fig. 4):
   Normalizes channels via projection and decodes visual component masks $Y_i^-, Y_i^+, Y_i^t$ through 4 residual reconstruction blocks.
 - **Component Reconstruction Loss** (Eq. 10):
-  $$L_R = \frac{1}{N} \sum_{i=1}^N \sum_{v \in \{-, +, t\}} \ell_1(T_i^v, Y_i^v)$$
+  $$\mathcal{L}_R = \frac{1}{N} \sum_{i=1}^N \sum_{v \in \{-, +, t\}} |T_i^v - Y_i^v|_1$$
 
 ### 3. Clothes Identification (CI) Branch & DAD Module
-- **Clothes Classifier** $C_P(\cdot | c)$ with fine-grained clothes classification loss $L_c$ (Eq. 11-12).
-- **Clothes Adversarial Loss** $L_{ca}$ (Eq. 13-14) with adversarial smoothing weight $q(c)$.
+- **Clothes Classifier** $C_P(\cdot | c)$ with fine-grained clothes classification loss $\mathcal{L}_c$ (Eq. 11-12).
+- **Clothes Adversarial Loss** $\mathcal{L}_{ca}$ (Eq. 13-14) to penalize correlation between clothing and identity.
 - **Deep Assembled Disentanglement (DAD) Module** (Eq. 15-18):
   Assembles feature vector $G_i = F_i^+ \oplus F_{ai}^- \oplus F_i^t$ where $F_{ai}^-$ is randomly permuted across identities in the batch, forcing the model to classify identity using clothing-invariant features.
-- **Two-Stage Total Loss Optimization** (Eq. 19-20):
-  - Stage 1: $L = L_{ID} + L_{triplet} + L_c + L_R$
-  - Stage 2: $L = L_{ID} + L_{triplet} + L_c + L_{ca} + \alpha L_{ac} + \gamma L_{ID}' + L_R$
+- **Two-Stage Optimization Protocol**:
+  - Stage 1: $\mathcal{L} = \mathcal{L}_{ID} + \mathcal{L}_{\text{triplet}} + 0.5 \mathcal{L}_c + 0.2 \mathcal{L}_R$
+  - Stage 2: $\mathcal{L} = \mathcal{L}_{ID} + \mathcal{L}_{\text{triplet}} + 0.5 \mathcal{L}_c + 0.1 \mathcal{L}_{ca} + 0.2 \mathcal{L}_R$
 
 ---
 
-## 📊 Cross-Condition Benchmark Evaluation & Convergence Tracking
+## 📊 Empirical Benchmark Evaluation: Baseline vs. CUDA-Optimized
 
-The evaluation protocol follows the Market-1501 single-query CMC/mAP protocol (excluding same-identity same-camera hits). Below is the status comparing the current training checkpoint against the final paper convergence targets:
+Both checkpoints were benchmarked under identical test manifests, 512-dimensional $L_2$-normalized embeddings, cosine distance calculation, and Market-1501 junk exclusion rules.
 
-| Dataset Subset | Surveillance Condition | Query / Gallery | Checkpoint Rank-1 (%) | Checkpoint Rank-5 (%) | Checkpoint Rank-10 (%) | Checkpoint mAP (%) | Target Rank-1 (%) | Target Rank-5 (%) | Target Rank-10 (%) | Target mAP (%) | Convergence Progress |
-| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **`both_small`** | Combined Benchmark | 475 / 2,146 | **13.13%** | **24.95%** | **35.16%** | **6.98%** | **88.52%** | **96.24%** | **98.41%** | **82.40%** | `[==        ] 14.8%` |
-| **`with_bag`** | Person with Bag / Accessory | 322 / 1,131 | **8.50%** | **18.20%** | **27.40%** | **9.22%** | **85.10%** | **94.81%** | **97.53%** | **79.12%** | `[=         ] 10.0%` |
-| **`without_bag`** | Person without Bag | 179 / 986 | **44.44%** | **63.89%** | **75.00%** | **30.79%** | **91.24%** | **97.60%** | **99.15%** | **85.74%** | `[=====     ] 48.7%` |
-| **`both_large`** | Full Scale Surveillance | 1,265 / 10,048 | **56.00%** | **92.00%** | **96.00%** | **44.90%** | **87.80%** | **95.92%** | **98.11%** | **81.65%** | `[======    ] 63.8%` |
-| **`prcc_cc`** | **PRCC Cloth-Changing (Cam A → C)** | 3,384 / 3,543 | **23.44%** | **43.75%** | **54.69%** | **40.18%** | **57.20%** | **78.40%** | **85.10%** | **57.40%** | `[====      ] 41.0%` |
-| **`prcc_sc`** | **PRCC Same-Clothes (Cam A → B)** | 3,384 / 3,873 | **81.25%** | **82.81%** | **87.50%** | **76.11%** | **85.40%** | **95.80%** | **97.60%** | **83.60%** | `[========= ] 95.1%` |
-| **`prcc_all`** | **PRCC Combined (Cam A → B+C)** | 3,384 / 7,416 | **81.25%** | **82.81%** | **87.50%** | **76.08%** | **72.80%** | **88.50%** | **92.30%** | **68.50%** | `[==========] 100.0%` |
+### 1. FULL Exhaustive Evaluation (Complete Valid Test Splits)
 
-> [!NOTE]
-> **Training Convergence Roadmap**: As requested, the evaluation suite and dashboard transparently display the current model checkpoint empirical accuracy alongside the paper target convergence benchmarks. The two-stage training loop continues to optimize towards the final ~88.52% Rank-1 target.
+| Dataset Subset | Surveillance Condition | Query Count | Valid Queries | Gallery Count | Baseline Rank-1 | Baseline mAP | CUDA-Optimized Rank-1 | CUDA-Optimized mAP | Absolute Gain (Rank-1) | Absolute Gain (mAP) |
+|:---|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| **`both_small`** | Combined Small Subset | 475 | 457 | 2,146 | 22.54% | 10.71% | **68.49%** | **47.20%** | **+45.95 pp** | **+36.49 pp** |
+| **`with_bag`** | Bag / Accessory Occlusion | 322 | 318 | 1,131 | 13.84% | 5.31% | **60.69%** | **37.11%** | **+46.85 pp** | **+31.80 pp** |
+| **`without_bag`** | Clean Body Silhouette | 179 | 155 | 986 | 45.81% | 26.55% | **90.32%** | **77.54%** | **+44.51 pp** | **+50.99 pp** |
+| **`both_large`** | Full-Scale Surveillance | 1,265 | 1,244 | 10,048 | 25.72% | 7.82% | **76.29%** | **44.26%** | **+50.57 pp** | **+36.44 pp** |
+| **`prcc_cc`** | **Cloth-Changing (Cam A → C)** | 3,384 | 3,384 | 3,543 | 4.70% | 4.79% | **7.36%** | **9.19%** | **+2.66 pp** | **+4.40 pp** |
+| **`prcc_sc`** | **Same-Clothes (Cam A → B)** | 3,384 | 3,384 | 3,873 | 4.43% | 5.04% | **30.08%** | **24.73%** | **+25.65 pp** | **+19.69 pp** |
+| **`prcc_all`** | **PRCC Combined (Cam A → B+C)** | 3,384 | 3,384 | 7,416 | 4.70% | 3.79% | **12.77%** | **10.13%** | **+8.07 pp** | **+6.34 pp** |
 
-### Computational Complexity & FLOPs vs ResNet-50
+*All 7 subsets demonstrate verified positive gains in both Rank-1 and mAP.*
 
-| Metric | Proposed Lightweight DCR-ReID | Standard ResNet-50 Baseline | Advantage |
-| :--- | :---: | :---: | :---: |
-| **Backbone Parameters** | **4.90 M** | 25.6 M | **80.9% Reduction** |
-| **Total Model Parameters** | **9.78 M** | 25.6 M | **61.8% Reduction** |
-| **Floating Point Operations (FLOPs)** | **3.00 GFLOPs** (1.50 GMACs) | 8.20 GFLOPs (4.10 GMACs) | **63.4% FLOP Reduction** |
-| **Model Disk Size** | **36.7 MB** (12.9 MB Backbone) | 98.0 MB | **62.6% Smaller** |
-| **Inference Latency (CPU)** | **20.8 ms** | 78.2 ms | **3.76× Speedup** |
-| **Throughput** | **48.0 FPS** | 12.8 FPS | **Real-Time Edge Capable** |
+### 2. FAST Diagnostic Mode Evaluation (`evaluate.py --fast`)
+
+Evaluated with deterministic stratified representative sampling (`seed=42`, `max_query=64`, `max_gallery=224`):
+
+| Dataset Subset | Baseline Rank-1 | Baseline mAP | CUDA-Optimized Rank-1 | CUDA-Optimized mAP | Absolute Gain (Rank-1) | Absolute Gain (mAP) |
+|:---|:---:|:---:|:---:|:---:|:---:|:---:|
+| **`both_small`** | 18.18% | 22.24% | **70.91%** | **75.55%** | **+52.73 pp** | **+53.31 pp** |
+| **`with_bag`** | 11.48% | 10.25% | **52.46%** | **52.51%** | **+40.98 pp** | **+42.26 pp** |
+| **`without_bag`** | 29.82% | 30.71% | **87.72%** | **83.20%** | **+57.90 pp** | **+52.49 pp** |
+| **`both_large`** | 22.41% | 26.87% | **68.97%** | **73.00%** | **+46.56 pp** | **+46.13 pp** |
+| **`prcc_cc`** | 3.12% | 5.84% | **6.25%** | **13.40%** | **+3.13 pp** | **+7.56 pp** |
+| **`prcc_sc`** | 4.69% | 7.96% | **18.75%** | **24.36%** | **+14.06 pp** | **+16.40 pp** |
+| **`prcc_all`** | 3.12% | 5.67% | **7.81%** | **12.89%** | **+4.69 pp** | **+7.22 pp** |
+
+---
+
+## ⚡ Computational Efficiency & Lightweight Edge Profiling
+
+Measured on the **NVIDIA GeForce RTX 4060 Laptop GPU** (8 GB VRAM) and host CPU:
+
+| Metric | Measurement / Value | ResNet-50 Reference | Efficiency Assessment |
+|:---|:---:|:---:|:---|
+| **Total Parameters** | **9,752,277 (9.75 M)** | 25.56 M | **61.8% Parameter Reduction** |
+| **Backbone Parameters** | **4.90 M** | 25.56 M | **80.9% Backbone Reduction** |
+| **Theoretical FLOPs** | **3.0015 GFLOPs** (at 256×128) | 8.20 GFLOPs | **63.4% FLOP Reduction** |
+| **Theoretical MACs** | **1.5007 GMACs** ($1 \text{ MAC} = 2 \text{ FLOPs}$) | 4.10 GMACs | **63.4% MAC Reduction** |
+| **GPU Latency (Batch-1, Synchronized)** | **11.07 ms** (Median) | ~35 ms | **3.16× Faster** |
+| **GPU Batched Throughput (BS=32)** | **2,694.9 FPS** (0.371 ms / img) | ~400 FPS | **Real-Time Edge Capable** |
+| **Peak GPU VRAM (Training)** | **488.9 MB** | ~2.5 GB | **< 6.1% VRAM Utilized** |
+| **CPU Latency (Batch-1)** | **31.44 ms** (31.8 FPS) | ~78 ms | **2.48× Faster** |
+| **Model Checkpoint Size** | **37.5 MB** | 98.0 MB | **61.7% Smaller Footprint** |
 
 ---
 
@@ -96,96 +118,98 @@ The evaluation protocol follows the Market-1501 single-query CMC/mAP protocol (e
 
 ```
 Lightweight_Person_Re-Identification_Model/
-├── Data_set/
-│   ├── prcc/                  # PRCC Cloth-Changing Dataset (33,698 images, 221 PIDs)
-│   │   └── rgb/               # train (150 PIDs), test/A, test/B, test/C (71 PIDs)
-│   ├── both_small/            # Combined small dataset split
-│   ├── both_large/            # Combined full dataset split
-│   ├── with_bag/              # Person images with bags
-│   └── without_bag/           # Person images without bags
 ├── checkpoints/
-│   └── best_model.pth         # Verified trained model weights
+│   ├── best_model.pth                      # Original baseline checkpoint (preserved strictly unchanged)
+│   └── experiments/
+│       └── dcr_reid_cuda_v1/
+│           ├── best_model.pth              # Selected CUDA-optimized checkpoint
+│           └── final_model.pth             # Final epoch checkpoint
 ├── data/
-│   └── dataset_loader.py      # Re-ID Dataset parser & PyTorch DataLoader
+│   └── dataset_loader.py                   # Data loader, PK sampler, transforms, PRCC label mapping
 ├── models/
-│   ├── lightweight_reid.py    # Full 3-branch DCR-ReID (CRD, DAD, Decoders)
-│   └── loss.py                # L_ID, Triplet, L_R, L_c, L_ca, L_ac suite
+│   ├── lightweight_reid.py                 # Lightweight DCR-ReID (Stem, Stages 1-4, CRD, DAD, BNNeck)
+│   └── loss.py                             # Label-smoothed CE, Batch-Hard Triplet, L1 Recon, Clothes Loss
 ├── utils/
-│   ├── metrics.py             # mAP & Rank-1/5/10 CMC evaluator
-│   ├── visualization.py       # 4-panel visualizer (Body, Clothes, Contour)
-│   └── reid_engine.py         # Batch & cached Re-ID inference engine
-├── train.py                   # Two-stage DCR-ReID PyTorch training script
-├── evaluate.py                # Dual-section benchmark & convergence profiler
-├── demo_cli.py                # CLI query search & retrieval demo
-├── app.py                     # Flask Web Application backend
-├── templates/
-│   └── index.html             # Glassmorphism Dark Mode Dashboard
-├── static/
-│   ├── css/style.css          # Modern styling system
-│   └── js/main.js             # Async UI interaction logic
-└── README.md
+│   ├── metrics.py                          # Market-1501 junk exclusion, CMC Rank-k, mAP computation
+│   ├── visualization.py                    # 4-panel visualizer (Body, Clothes, Contour, DAD)
+│   └── reid_engine.py                      # Re-ID feature extraction engine
+├── tests/
+│   └── test_dcr_reid.py                    # 22 automated regression & unit tests
+├── reports/
+│   ├── baseline/
+│   │   ├── baseline_metrics.json           # Canonical baseline metrics snapshot
+│   │   └── baseline_summary.md             # Baseline reproduction verification
+│   ├── environment_audit.md                # CUDA environment & 8 acceptance tests
+│   ├── evaluation_protocol_audit.md        # Dataset split integrity & junk filtering
+│   ├── model_implementation_audit.md       # Architecture & loss function audit
+│   ├── clothing_invariance_analysis.md     # PRCC clothing invariance & hyperspherical analysis
+│   ├── efficiency_benchmark.md             # Latency, FLOPs, MACs, throughput, VRAM audit
+│   ├── final_evaluation.md                 # Full parity benchmark report
+│   ├── final_metrics.json                  # Machine-readable final benchmark metrics
+│   ├── experiment_comparison.csv           # Tabular comparison across all 7 subsets
+│   └── test_results.md                     # Regression test execution report
+├── requirements_cuda.txt                   # Reproducible CUDA dependencies (PyTorch 2.5.1+cu124)
+├── evaluate.py                             # Evaluation benchmark script (FAST / FULL / device selection)
+├── run_full_parity_benchmark.py            # Automated 7-subset parity benchmark script
+├── train_cuda.py                           # CUDA training script (PK sampling, AMP, 2-stage loss)
+├── verify_cuda.py                          # CUDA environment diagnostic tool
+└── README.md                               # Project documentation
 ```
 
 ---
 
-## 🚀 How to Run
+## 🚀 Environment Setup & Reproduction Guide
 
-### 1. Requirements
+### 1. Environment Installation
+For hardware GPU acceleration with PyTorch 2.5.1 and CUDA 12.4:
 ```bash
-pip install torch torchvision opencv-python pillow matplotlib seaborn scikit-learn flask pypdf
+# Create dedicated CUDA virtual environment
+python -m venv .venv_cuda
+.\.venv_cuda\Scripts\activate
+
+# Install CUDA-enabled PyTorch and dependencies
+pip install torch==2.5.1+cu124 torchvision==0.20.1+cu124 --extra-index-url https://download.pytorch.org/whl/cu124
+pip install numpy pillow
 ```
 
-### 2. Run Comprehensive Benchmark Evaluation
-Fast mode (sampled query & gallery evaluation in seconds):
+### 2. Verify CUDA Acceptance
+Run the diagnostic script to verify GPU detection, tensor math, model forward/backward pass, and AMP:
+```bash
+python verify_cuda.py
+```
+
+### 3. Run Automated Regression Test Suite
+Run all 22 automated unit and regression tests:
+```bash
+python -m unittest tests/test_dcr_reid.py
+```
+
+### 4. FAST Diagnostic Evaluation
+Run FAST evaluation with device auto-detection:
 ```bash
 python evaluate.py --fast
 ```
-Full exhaustive benchmark evaluation:
+Or force specific devices:
 ```bash
-python evaluate.py --full
+python evaluate.py --fast --device cuda
+python evaluate.py --fast --device cpu
 ```
 
-### 3. Run Command-Line Query Search Demo
+### 5. FULL Parity Benchmark Across All 7 Subsets
+Run full exhaustive evaluation comparing baseline and CUDA checkpoints:
 ```bash
-python demo_cli.py
-```
-Or specify a custom query image and top-K:
-```bash
-python demo_cli.py --query ./Data_set/both_small/query/0100_c1_f421.jpg --top_k 5
+python run_full_parity_benchmark.py
 ```
 
-### 4. Run Interactive Web Dashboard
+### 6. Train the Improved Model with CUDA Acceleration
+Train with identity-balanced $P \times K$ sampling ($P=8, K=4$), Automatic Mixed Precision, and two-stage optimization:
 ```bash
-python app.py
-```
-Open browser at: **`http://127.0.0.1:5000`**
-Features:
-- **Query Search**: Upload custom image or select sample thumbnails across datasets.
-- **4-Panel Component Disentanglement Visualizer**: Inspect body structure focus ($Y^+$), apparel pattern ($Y^-$), contour boundary, and DAD attention overlay.
-- **Mathematical Architecture Viewer**: Full breakdown of PI, CR, CI branches and equations.
-- **Benchmark & Convergence Tracking**: Interactive tables with Rank-1/5/10 and convergence progress bars.
-- **Edge Efficiency Comparison**: Real-time stats comparing Lightweight DCR-ReID vs ResNet-50.
-
-### 5. Train the Model (Two-Stage DCR-ReID Optimization)
-
-#### Training Status & Checkpoints
-- The model training pipeline has been executed and validated on PRCC and the benchmark surveillance splits.
-- Active weights are saved at `checkpoints/best_model.pth` and `checkpoints/final_model.pth`.
-- The current checkpoint achieves **81.25% Rank-1** on Same-Clothes (`prcc_sc`) and **23.44% Rank-1** on Cloth-Changing (`prcc_cc`), actively progressing towards the ~57.20% and ~88.52% paper targets.
-
-#### Quick Pipeline Validation (Smoke Test)
-Validate the training pipeline (data loading, component mask generation, forward/backward pass, and evaluation) in seconds:
-```bash
-python train.py --dataset_type prcc_cc --epochs 1 --batch_size 16 --max_batches 10
+python train_cuda.py --dataset_type both_small --epochs 15 --batch_size 32 --lr 0.00035 --use_pk_sampler --use_amp
 ```
 
-#### Full Multi-Epoch Training on PRCC Cloth-Changing
-- **Standard CPU Training**:
-  ```bash
-  python train.py --dataset_type prcc_cc --epochs 15 --batch_size 16 --lr 0.0003
-  ```
-- **GPU Accelerated Training (CUDA / Google Colab / Kaggle)**:
-  ```bash
-  python train.py --dataset_type prcc_cc --epochs 60 --batch_size 32 --lr 0.0003
-  ```
-  *The training script automatically switches to CUDA device if available, logging training loss components ($L_{ID}, L_{triplet}, L_R, L_c$), updating the learning rate via Cosine Annealing, and evaluating CMC Rank-1/5/10 and mAP every 5 epochs.*
+---
+
+## ⚠️ Known Limitations & Deployment Notes
+1. **Bag / Accessory Occlusion**: Bulky backpacks and messenger bags occlude the torso region ($y \in [0.22, 0.85]$). Because DCR-ReID inference suppresses the clothes-relevant branch $F_i^-$ (where bag textures route), biometric signal is concentrated in the head and lower limbs.
+2. **End-to-End Surveillance Latency**: The 11.07 ms single-image inference latency profiles neural network feature extraction. Real-world edge surveillance pipelines additionally include upstream RTSP video decoding (~2–4 ms), YOLO person detection (~8–15 ms), and SORT tracking (~1–3 ms).
+3. **Cross-Dataset Generalization**: Checkpoints trained on Market-1501-style subsets (`both_small`) exhibit high Rank-1 on surveillance subsets (68.49% on `both_small`, 90.32% on `without_bag`), but cross-clothing generalization on PRCC requires dedicated cross-clothing pairs in training.
