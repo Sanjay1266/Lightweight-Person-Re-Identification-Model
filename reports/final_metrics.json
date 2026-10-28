@@ -43,6 +43,11 @@
       "path": "checkpoints/experiments/dcr_reid_cuda_v1/best_model.pth",
       "sha256": "4352d72c75c81db69ce06ad743190830ac7e74b5ce46fc5493c7572505966121",
       "state": "Controlled GPU trained checkpoint with PK-sampler, AMP, and PRCC label fix"
+    },
+    "paper_faithful_track_a": {
+      "path": "checkpoints/paper_dcr_best.pth",
+      "sha256": "5688f2da02047a4849b7d6f8efb980d26124e697c02aac4d99fd521635a247ff",
+      "state": "Paper-Faithful DCR-ReID (ResNet-50, CRD 2560-D, 4096-D inference) trained via Two-Stage optimization"
     }
   },
   "metrics_full_exhaustive": {
@@ -367,5 +372,58 @@
     "raw_pid_overlap_train_vs_gallery": 0,
     "file_path_leakage": 0,
     "partition_integrity": "100% strictly disjoint identity partitions across all 7 subsets"
+  },
+  "track_a_paper_faithful_model": {
+    "architecture": "Paper-Faithful DCR-ReID (IEEE TCSVT 2023)",
+    "backbone": "ResNet-50 (ImageNet-pretrained, layer4 stride-1)",
+    "input_resolution": [
+      384,
+      192
+    ],
+    "crd_channels": {
+      "p_plus": 1024,
+      "p_minus": 512,
+      "p_contour": 1024,
+      "total": 2560
+    },
+    "inference_dimension": 4096,
+    "total_parameters": 32818819,
+    "gflops": 22.62,
+    "single_image_latency_ms": 23.2,
+    "batched_throughput_fps": 241.8,
+    "prcc_full_benchmarks": {
+      "epoch_1_stage1": {
+        "rank1": 28.78,
+        "rank5": 34.31,
+        "rank10": 37.59,
+        "mAP": 26.7
+      },
+      "epoch_2_stage2": {
+        "rank1": 39.51,
+        "rank5": 45.18,
+        "rank10": 49.32,
+        "mAP": 39.24
+      }
+    },
+    "prcc_fast_diagnostic": {
+      "prcc_cc": {
+        "rank1": 51.56,
+        "rank5": 57.81,
+        "rank10": 67.19,
+        "mAP": 51.28
+      },
+      "prcc_sc": {
+        "rank1": 92.19,
+        "rank5": 95.31,
+        "rank10": 98.44,
+        "mAP": 90.74
+      },
+      "prcc_all": {
+        "rank1": 82.81,
+        "rank5": 90.62,
+        "rank10": 90.62,
+        "mAP": 71.09
+      }
+    }
   }
 }
