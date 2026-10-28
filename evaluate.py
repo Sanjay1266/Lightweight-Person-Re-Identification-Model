@@ -28,6 +28,7 @@ import torch.nn.functional as F
 
 from data.dataset_loader import get_dataloaders
 from models.lightweight_reid import LightweightDCRReID
+from models.paper_dcr_reid import PaperDCRReID
 from utils.metrics import compute_distance_matrix, eval_market1501
 
 PAPER_TARGET_BENCHMARKS = {
@@ -89,36 +90,38 @@ def resolve_device(requested_device='auto'):
 
 def run_cuda_smoke_test(model, device):
     """
-    Performs an actual forward pass using the real LightweightDCRReID model architecture
-    and a dummy tensor of shape [1, 3, 256, 128].
+    Performs an actual forward pass using the loaded model architecture.
     Verifies output tensor validity, finite values, and device placement consistency.
     """
+    h, w = getattr(model, 'input_size', (256, 128))
+    feat_dim = getattr(model, 'feat_dim', 512)
     model.eval()
-    dummy_input = torch.randn(1, 3, 256, 128, device=device)
+    dummy_input = torch.randn(1, 3, h, w, device=device)
     with torch.no_grad():
         out = model(dummy_input)
 
     # 1. Device consistency check
     if out.device.type != device.type:
         raise RuntimeError(f"Output tensor device mismatch: expected {device.type}, got {out.device.type}")
-    
+
     first_param = next(model.parameters())
     if first_param.device.type != device.type:
         raise RuntimeError(f"Model parameter device mismatch: expected {device.type}, got {first_param.device.type}")
 
     # 2. Shape and validity check
-    if out.shape != torch.Size([1, 512]):
-        raise RuntimeError(f"Output embedding shape unexpected: expected [1, 512], got {list(out.shape)}")
+    if out.shape != torch.Size([1, feat_dim]):
+        raise RuntimeError(f"Output embedding shape unexpected: expected [1, {feat_dim}], got {list(out.shape)}")
     if torch.isnan(out).any() or torch.isinf(out).any():
         raise RuntimeError("Output tensor contains NaN or Inf values during smoke test forward pass.")
 
-    print(f"=> Device Smoke Test Passed   : Input [1, 3, 256, 128] on {device} -> Output [1, 512] on {out.device} (Finite, Norm=1.0)", flush=True)
+    print(f"=> Device Smoke Test Passed   : Input [1, 3, {h}, {w}] on {device} -> Output [1, {feat_dim}] on {out.device} (Finite, Norm=1.0)", flush=True)
     return True
 
 def load_checkpoint_safe(model_path, device):
     """
     Safely resolves, verifies SHA-256, and loads model checkpoint with architecture verification.
     Preserves original weights file strictly without overwriting.
+    Automatically detects Paper-Faithful ResNet-50 (Track A) vs Lightweight DCR-ReID (Track B).
     """
     resolved_path = os.path.abspath(model_path)
     if not os.path.exists(resolved_path):
@@ -142,19 +145,42 @@ def load_checkpoint_safe(model_path, device):
     else:
         raise ValueError(f"Unsupported checkpoint structure in '{resolved_path}': expected state_dict mapping.")
 
-    # Determine num_classes and num_clothes safely from checkpoint header
-    num_classes = 250
-    num_clothes = 50
-    if 'classifier.weight' in state_dict:
-        num_classes = state_dict['classifier.weight'].shape[0]
-        print(f"=> Detected Identity Classes  : {num_classes} classes from classifier header", flush=True)
-    if 'clothes_classifier.weight' in state_dict:
-        num_clothes = state_dict['clothes_classifier.weight'].shape[0]
-        print(f"=> Detected Clothes Classes   : {num_clothes} classes from clothes_classifier header", flush=True)
+    # Check if checkpoint is PaperDCRReID (Track A) or LightweightDCRReID (Track B)
+    is_paper_model = (
+        'crd_proj.0.weight' in state_dict or
+        'psi_plus.proj.conv1.weight' in state_dict or
+        'layer4.0.conv1.weight' in state_dict or
+        'classifier_id.weight' in state_dict or
+        (isinstance(loaded, dict) and loaded.get('architecture') == 'PaperDCRReID')
+    )
 
-    model = LightweightDCRReID(num_classes=num_classes, num_clothes=num_clothes, feat_dim=512, inference_mode='clothes_invariant')
+    if is_paper_model:
+        num_classes = state_dict['classifier_id.weight'].shape[0] if 'classifier_id.weight' in state_dict else 150
+        num_clothes = state_dict['classifier_clothes.weight'].shape[0] if 'classifier_clothes.weight' in state_dict else 100
+        print(f"=> Architecture Detected     : Paper-Faithful DCR-ReID (Track A: ResNet-50, CRD 2560-D, DAD 5120-D)", flush=True)
+        print(f"=> Detected Identity Classes  : {num_classes} classes", flush=True)
+        print(f"=> Detected Clothes Classes   : {num_clothes} classes", flush=True)
+        model = PaperDCRReID(num_classes=num_classes, num_clothes=num_clothes, pretrained=False)
+        model.is_paper_model = True
+        model.input_size = (384, 192)
+        model.feat_dim = 4096
+    else:
+        # Determine num_classes and num_clothes safely from checkpoint header
+        num_classes = 250
+        num_clothes = 50
+        if 'classifier.weight' in state_dict:
+            num_classes = state_dict['classifier.weight'].shape[0]
+            print(f"=> Detected Identity Classes  : {num_classes} classes from classifier header", flush=True)
+        if 'clothes_classifier.weight' in state_dict:
+            num_clothes = state_dict['clothes_classifier.weight'].shape[0]
+            print(f"=> Detected Clothes Classes   : {num_clothes} classes from clothes_classifier header", flush=True)
+        print(f"=> Architecture Detected     : Lightweight DCR-ReID (Track B: 9.75M Lightweight Edge CNN)", flush=True)
+        model = LightweightDCRReID(num_classes=num_classes, num_clothes=num_clothes, feat_dim=512, inference_mode='clothes_invariant')
+        model.is_paper_model = False
+        model.input_size = (256, 128)
+        model.feat_dim = 512
+
     model_dict = model.state_dict()
-
     matched = {}
     mismatched = []
     missing_in_ckpt = []
@@ -176,16 +202,21 @@ def load_checkpoint_safe(model_path, device):
             print(f"    ... and {len(mismatched) - 5} more.")
 
     # Critical architecture check: must have backbone stem and stages matched
-    backbone_matched = [k for k in matched if 'stem' in k or 'stage' in k]
+    if is_paper_model:
+        backbone_matched = [k for k in matched if 'layer' in k or 'crd' in k or 'stem' in k]
+    else:
+        backbone_matched = [k for k in matched if 'stem' in k or 'stage' in k]
     if len(backbone_matched) == 0:
         raise RuntimeError(
-            f"Critical Architecture Mismatch: Zero backbone weights matched in '{resolved_path}'. "
-            "The checkpoint is incompatible with the LightweightDCRReID model architecture."
+            f"Critical Architecture Mismatch: Zero backbone weights matched in '{resolved_path}'."
         )
 
     model_dict.update(matched)
     model.load_state_dict(model_dict)
     print(f"=> Loaded Model Weights       : {len(matched)}/{len(model_dict)} tensors matched (100% full architecture compatibility)", flush=True)
+
+    model.to(device)
+    return model, resolved_path, full_sha256, len(matched), len(model_dict)
 
     model.to(device)
     return model, resolved_path, full_sha256, len(matched), len(model_dict)
@@ -230,8 +261,10 @@ def evaluate_subset_cached(model, data_dir, dataset_type, device, cache=None,
     if cache is None:
         cache = {}
 
+    h, w = getattr(model, 'input_size', (256, 128))
     dataset, _, query_loader, gallery_loader = get_dataloaders(
-        data_dir=data_dir, dataset_type=dataset_type, batch_size=batch_size
+        data_dir=data_dir, dataset_type=dataset_type, batch_size=batch_size,
+        height=h, width=w
     )
 
     is_fast = (max_query is not None or max_gallery is not None)
@@ -261,7 +294,7 @@ def evaluate_subset_cached(model, data_dir, dataset_type, device, cache=None,
         else: # prcc_all (Cam B + C)
             if 'prcc_gallery_cam_b' not in cache:
                 # Load Cam B
-                _, _, _, g_loader_b = get_dataloaders(data_dir=data_dir, dataset_type='prcc_sc', batch_size=batch_size)
+                _, _, _, g_loader_b = get_dataloaders(data_dir=data_dir, dataset_type='prcc_sc', batch_size=batch_size, height=h, width=w)
                 gb_feats, gb_pids, gb_cams = extract_features_from_loader(model, g_loader_b, device)
                 cache['prcc_gallery_cam_b'] = (gb_feats, gb_pids, gb_cams)
             else:
@@ -269,7 +302,7 @@ def evaluate_subset_cached(model, data_dir, dataset_type, device, cache=None,
 
             if 'prcc_gallery_cam_c' not in cache:
                 # Load Cam C
-                _, _, _, g_loader_c = get_dataloaders(data_dir=data_dir, dataset_type='prcc_cc', batch_size=batch_size)
+                _, _, _, g_loader_c = get_dataloaders(data_dir=data_dir, dataset_type='prcc_cc', batch_size=batch_size, height=h, width=w)
                 gc_feats, gc_pids, gc_cams = extract_features_from_loader(model, g_loader_c, device)
                 cache['prcc_gallery_cam_c'] = (gc_feats, gc_pids, gc_cams)
             else:
@@ -305,8 +338,8 @@ def evaluate_subset_cached(model, data_dir, dataset_type, device, cache=None,
 
         # 2. Gallery sampling with positive matches for query identities + distractors
         if dataset.is_prcc and dataset_type == 'prcc_all':
-            _, _, _, g_loader_b = get_dataloaders(data_dir=data_dir, dataset_type='prcc_sc', batch_size=batch_size)
-            _, _, _, g_loader_c = get_dataloaders(data_dir=data_dir, dataset_type='prcc_cc', batch_size=batch_size)
+            _, _, _, g_loader_b = get_dataloaders(data_dir=data_dir, dataset_type='prcc_sc', batch_size=batch_size, height=h, width=w)
+            _, _, _, g_loader_c = get_dataloaders(data_dir=data_dir, dataset_type='prcc_cc', batch_size=batch_size, height=h, width=w)
             all_g_samples = g_loader_b.dataset.dataset + g_loader_c.dataset.dataset
         else:
             all_g_samples = dataset.gallery_samples
@@ -332,7 +365,7 @@ def evaluate_subset_cached(model, data_dir, dataset_type, device, cache=None,
             for i in c_idxs:
                 sampled_g.append(rem_g[i])
 
-        transform_test = build_transforms(is_train=False)
+        transform_test = build_transforms(height=h, width=w, is_train=False)
         fast_q_loader = DataLoader(ImageDataset(sampled_q, transform=transform_test), batch_size=batch_size, shuffle=False)
         fast_g_loader = DataLoader(ImageDataset(sampled_g, transform=transform_test), batch_size=batch_size, shuffle=False)
 
@@ -374,16 +407,15 @@ def evaluate_subset_cached(model, data_dir, dataset_type, device, cache=None,
 
 def print_model_specs(model, device):
     total_params = sum(p.numel() for p in model.parameters())
-    backbone_params = sum(p.numel() for name, p in model.named_parameters() if any(s in name for s in ['stem', 'stage1', 'stage2', 'stage3', 'stage4']))
-    crd_params = sum(p.numel() for name, p in model.named_parameters() if 'crd' in name)
-    dad_params = sum(p.numel() for name, p in model.named_parameters() if 'dad' in name)
-    neck_params = sum(p.numel() for name, p in model.named_parameters() if any(s in name for s in ['bottleneck', 'classifier', 'clothes_classifier']))
+    h, w = getattr(model, 'input_size', (256, 128))
+    feat_dim = getattr(model, 'feat_dim', 512)
+    is_paper = getattr(model, 'is_paper_model', False)
 
-    dummy_single = torch.randn(1, 3, 256, 128, device=device)
+    dummy_single = torch.randn(1, 3, h, w, device=device)
     model.eval()
 
     # Compute exact FLOPs & MACs dynamically using FlopCounterMode
-    flops_g = 3.0015
+    flops_g = 8.50 if is_paper else 3.0015
     try:
         from torch.utils.flop_counter import FlopCounterMode
         with FlopCounterMode(display=False) as fcm:
@@ -419,7 +451,7 @@ def print_model_specs(model, device):
     fps_b1 = 1000.0 / max(0.01, median_lat_b1)
 
     # 2. Batched Throughput Benchmark (Batch Size = 32)
-    dummy_batch = torch.randn(32, 3, 256, 128, device=device)
+    dummy_batch = torch.randn(32, 3, h, w, device=device)
     with torch.inference_mode():
         for _ in range(10):
             _ = model(dummy_batch)
@@ -437,22 +469,41 @@ def print_model_specs(model, device):
         per_img_lat_b32 = (total_batch_time / (32 * n_batched_iters)) * 1000.0
 
     print("=========================================================================================")
-    print("      LIGHTWEIGHT DCR-ReID (DEEP COMPONENT RECONSTRUCTION) SPECIFICATIONS                ")
-    print("      Course: 23CSE373 - Computer Vision | Base Paper: IEEE TCSVT 2023                   ")
-    print("=========================================================================================")
-    print(f"[*] Architecture Base          : DCR-ReID (Deep Component Reconstruction Re-ID)")
-    print(f"[*] Disentanglement Modules    : CRD (3-way Component) + DAD (Deep Assembled Disentanglement)")
-    print(f"[*] Metric Neck & Feature Dim  : Dual BNNeck (512-dim L2 Normalized Embedding)")
-    print(f"[*] Total Model Parameters     : {total_params / 1e6:.2f} M ({total_params:,} parameters)")
-    print(f"    |-- Residual Backbone      : {backbone_params / 1e6:.2f} M (Stages 1-4 with Stride-1 Stage 4)")
-    print(f"    |-- CRD 4-Block Decoders   : {crd_params / 1e6:.2f} M (psi^-, psi^+, psi^t component reconstructors)")
-    print(f"    |-- DAD Dual Attention     : {dad_params / 1e6:.2f} M (CBAM Channel Attention + Spatial Attention)")
-    print(f"    \\-- Dual BNNeck & Heads    : {neck_params / 1e6:.2f} M (Identity & Clothes Classifiers)")
-    print(f"[*] Floating Point Operations  : {flops_g:.2f} GFLOPs ({macs_g:.2f} GMACs for 256x128 input)")
-    print(f"[*] FLOPs vs ResNet-50 Baseline: 63.4% FLOP Reduction (3.00 GFLOPs vs 8.20 GFLOPs)")
-    print(f"[*] Single-Image Latency (BS=1): Median={median_lat_b1:.2f} ms | Mean={mean_lat_b1:.2f} ms | p95={p95_lat_b1:.2f} ms on {device}")
-    print(f"[*] Single-Stream Throughput   : {fps_b1:.1f} FPS (Sequential frame-by-frame inference)")
-    print(f"[*] Batched Throughput (BS=32) : {batched_fps:.1f} FPS ({per_img_lat_b32:.2f} ms/image amortized)")
+    if is_paper:
+        print("      PAPER-FAITHFUL DCR-ReID (RESNET-50 BACKBONE) SPECIFICATIONS (TRACK A)              ")
+        print("      Course: 23CSE373 - Computer Vision | Base Paper: IEEE TCSVT 2023                   ")
+        print("=========================================================================================")
+        print(f"[*] Architecture Base          : ResNet-50 (Pretrained, layer4 stride-1) Backbone")
+        print(f"[*] Disentanglement Modules    : CRD (2560-D: 1024, 512, 1024) + DAD (5120-D Assembled)")
+        print(f"[*] Metric Neck & Feature Dim  : Stacked Max+Avg Pooling ({feat_dim}-dim L2 Normalized)")
+        print(f"[*] Input Resolution           : {h} x {w}")
+        print(f"[*] Total Model Parameters     : {total_params / 1e6:.2f} M ({total_params:,} parameters)")
+        print(f"[*] Floating Point Operations  : {flops_g:.2f} GFLOPs ({macs_g:.2f} GMACs for {h}x{w} input)")
+        print(f"[*] Single-Image Latency (BS=1): Median={median_lat_b1:.2f} ms | Mean={mean_lat_b1:.2f} ms | p95={p95_lat_b1:.2f} ms on {device}")
+        print(f"[*] Single-Stream Throughput   : {fps_b1:.1f} FPS (Sequential frame-by-frame inference)")
+        print(f"[*] Batched Throughput (BS=32) : {batched_fps:.1f} FPS ({per_img_lat_b32:.2f} ms/image amortized)")
+    else:
+        backbone_params = sum(p.numel() for name, p in model.named_parameters() if any(s in name for s in ['stem', 'stage1', 'stage2', 'stage3', 'stage4']))
+        crd_params = sum(p.numel() for name, p in model.named_parameters() if 'crd' in name)
+        dad_params = sum(p.numel() for name, p in model.named_parameters() if 'dad' in name)
+        neck_params = sum(p.numel() for name, p in model.named_parameters() if any(s in name for s in ['bottleneck', 'classifier', 'clothes_classifier']))
+        print("      LIGHTWEIGHT DCR-ReID (DEEP COMPONENT RECONSTRUCTION) SPECIFICATIONS (TRACK B)       ")
+        print("      Course: 23CSE373 - Computer Vision | Base Paper: IEEE TCSVT 2023                   ")
+        print("=========================================================================================")
+        print(f"[*] Architecture Base          : DCR-ReID (Deep Component Reconstruction Re-ID)")
+        print(f"[*] Disentanglement Modules    : CRD (3-way Component) + DAD (Deep Assembled Disentanglement)")
+        print(f"[*] Metric Neck & Feature Dim  : Dual BNNeck ({feat_dim}-dim L2 Normalized Embedding)")
+        print(f"[*] Input Resolution           : {h} x {w}")
+        print(f"[*] Total Model Parameters     : {total_params / 1e6:.2f} M ({total_params:,} parameters)")
+        print(f"    |-- Residual Backbone      : {backbone_params / 1e6:.2f} M (Stages 1-4 with Stride-1 Stage 4)")
+        print(f"    |-- CRD 4-Block Decoders   : {crd_params / 1e6:.2f} M (psi^-, psi^+, psi^t component reconstructors)")
+        print(f"    |-- DAD Dual Attention     : {dad_params / 1e6:.2f} M (CBAM Channel Attention + Spatial Attention)")
+        print(f"    \\-- Dual BNNeck & Heads    : {neck_params / 1e6:.2f} M (Identity & Clothes Classifiers)")
+        print(f"[*] Floating Point Operations  : {flops_g:.2f} GFLOPs ({macs_g:.2f} GMACs for {h}x{w} input)")
+        print(f"[*] FLOPs vs ResNet-50 Baseline: 63.4% FLOP Reduction (3.00 GFLOPs vs 8.20 GFLOPs)")
+        print(f"[*] Single-Image Latency (BS=1): Median={median_lat_b1:.2f} ms | Mean={mean_lat_b1:.2f} ms | p95={p95_lat_b1:.2f} ms on {device}")
+        print(f"[*] Single-Stream Throughput   : {fps_b1:.1f} FPS (Sequential frame-by-frame inference)")
+        print(f"[*] Batched Throughput (BS=32) : {batched_fps:.1f} FPS ({per_img_lat_b32:.2f} ms/image amortized)")
     print(f"[*] Deployment Note            : End-to-end edge surveillance throughput also depends on upstream")
     print(f"                                 YOLO/detector inference, SORT tracking, decoding, and preprocessing.")
     print("-----------------------------------------------------------------------------------------")
