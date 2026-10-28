@@ -87,3 +87,4 @@ For each query image $q$ with identity $y_q$ and camera $c_q$:
 
 > [!WARNING]
 > Scores from FAST diagnostic mode must NEVER be compared against FULL benchmark mode, because gallery distractor sizes directly affect Rank-1 and mAP retrieval difficulty. Both baseline and improved checkpoints must be evaluated under identical evaluation modes.
+
