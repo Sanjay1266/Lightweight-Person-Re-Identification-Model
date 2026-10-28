@@ -312,21 +312,23 @@ def generate_clothing_labels(pids, cams, is_prcc=True, num_clothes=100):
         if invalid_mask.any():
             invalid_cams = cams[invalid_mask].tolist()
             raise ValueError(f"Invalid PRCC camera ID detected: {invalid_cams}. PRCC only supports cameras 0 (A), 1 (B), and 2 (C).")
-        
+
         # Explicit mapping: 0 for Cam A (0) and B (1); 1 for Cam C (2)
         clothes_condition = (cams == 2).long()
         clothes_labels = (pids * 2 + clothes_condition) % num_clothes
     else:
         clothes_labels = (pids * 2 + (cams % 2)).long() % num_clothes
-        
+
     return clothes_labels
 
 
-def get_dataloaders(data_dir, dataset_type='both_small', batch_size=32, num_workers=0, use_pk_sampler=False, num_instances=4):
+def get_dataloaders(data_dir, dataset_type='both_small', batch_size=32, num_workers=0, use_pk_sampler=False, num_instances=4, height=256, width=128, img_size=None):
+    if img_size is not None:
+        height, width = img_size
     dataset = PersonReIDDataset(data_dir=data_dir, dataset_type=dataset_type)
 
-    transform_train = build_transforms(is_train=True)
-    transform_test = build_transforms(is_train=False)
+    transform_train = build_transforms(height=height, width=width, is_train=True)
+    transform_test = build_transforms(height=height, width=width, is_train=False)
 
     if use_pk_sampler:
         sampler = RandomIdentitySampler(dataset.train_samples, batch_size=batch_size, num_instances=num_instances)
