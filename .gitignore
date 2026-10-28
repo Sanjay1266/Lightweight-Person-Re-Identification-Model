@@ -10,10 +10,12 @@ static/outputs/*.jpg
 *.log
 
 # Large Datasets
+Data_set/
 Data_set/prcc/
 
 # Environment & IDE
 .venv/
+.venv_cuda/
 env/
 ENV/
 .vscode/

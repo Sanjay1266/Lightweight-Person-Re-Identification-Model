@@ -1,0 +1,16 @@
+# Reproducible CUDA Environment Requirements
+# PyTorch 2.5.1 with CUDA 12.4 for NVIDIA RTX 4060 Laptop GPU
+# Install via:
+#   pip install torch==2.5.1+cu124 torchvision==0.20.1+cu124 --extra-index-url https://download.pytorch.org/whl/cu124
+#   pip install numpy pillow
+--extra-index-url https://download.pytorch.org/whl/cu124
+torch==2.5.1+cu124
+torchvision==0.20.1+cu124
+numpy>=1.26.0
+pillow>=10.0.0
+filelock>=3.13.0
+fsspec>=2024.0.0
+jinja2>=3.1.2
+networkx>=3.2.0
+sympy>=1.12
+typing-extensions>=4.8.0
