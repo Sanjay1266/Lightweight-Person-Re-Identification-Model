@@ -44,3 +44,4 @@
 1. **Preservation Guarantee**: `checkpoints/best_model.pth` is strictly preserved and will never be overwritten.
 2. **Reproducibility**: The evaluation was executed with `seed=42`. Query and gallery sampling are stratified across identity PIDs.
 3. **Parity**: The baseline metrics reproduced herein match the prompt's reference baseline exactly across all seven subsets.
+
