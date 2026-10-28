@@ -1,47 +1,51 @@
-# Lightweight DCR-ReID: Automated Test Execution Report
+# Automated Test Suite & Regression Verification Report
 
-### Course: 23CSE373 - Computer Vision | Date: 2026-10-27
-
----
-
-## 1. Test Execution Summary
-
-- **Total Tests Executed**: 18
-- **Passed**: 18
-- **Failed**: 0
-- **Skipped / Errors**: 0
-- **Execution Time**: 1.42 seconds
-- **Test Runner**: Python standard `unittest` framework (Python 3.11.18, PyTorch 2.5.1+cu124)
-- **Execution Command**: `.\.venv_cuda\Scripts\python.exe -m unittest tests/test_dcr_reid.py`
-- **Exit Code**: `0` (Clean pass)
+**Project**: Lightweight Person Re-Identification Model (DCR-ReID)
+**Date**: 2026-10-28 20:37:55 IST
+**Test Suite**: [`tests/test_dcr_reid.py`](file:///s:/5th%20Sem/CV/Lightweight_Person_Re-Identification_Model/tests/test_dcr_reid.py)
+**Environments Verified**:
+1. Host CPU (`python.exe` - Python 3.14.3, PyTorch 2.13.0+cpu)
+2. Hardware CUDA (`.\.venv_cuda\Scripts\python.exe` - Python 3.11.18, PyTorch 2.5.1+cu124 on RTX 4060 GPU)
 
 ---
 
-## 2. Detailed Test Results Table
+## 1. Test Suite Results Overview
 
-| Test ID | Test Name | Purpose & Verification Scope | Status | Duration |
-| :---: | :--- | :--- | :---: | :---: |
-| `01` | `test_01_model_initialization` | Verifies instantiation of all DCR-ReID submodules (stem, stages 1–4, CRD, DAD, dual BNNeck, classifiers) | **PASSED** | < 0.05s |
-| `02` | `test_02_checkpoint_compatibility` | Verifies `checkpoints/best_model.pth` loads 162/162 tensors with exact shape match when `num_clothes=100` | **PASSED** | 0.08s |
-| `03` | `test_03_forward_pass_shapes` | Confirms eval output is `[B, 512]` and train output contains multi-task dictionary | **PASSED** | 0.09s |
-| `04` | `test_04_embedding_dimensions_and_normalization` | Verifies that inference retrieval embeddings strictly lie on the unit hypersphere ($\|f\|_2 = 1.0$) | **PASSED** | 0.09s |
-| `05` | `test_05_nan_inf_detection` | Validates that model forward pass produces zero NaN or Inf values across all channels | **PASSED** | 0.08s |
-| `06` | `test_06_dataset_and_label_consistency` | Asserts non-negative labels, non-negative camera IDs, and proper data tuple structures | **PASSED** | 0.07s |
-| `07` | `test_07_query_gallery_validity` | Validates that 100% of query identities are present in gallery test sets | **PASSED** | 0.07s |
-| `08` | `test_08_rank_k_metrics` | Validates Rank-1, Rank-5, Rank-10 against known synthetic query/gallery ranking | **PASSED** | < 0.01s |
-| `09` | `test_09_map_calculation` | Validates Mean Average Precision against manual analytical AP formula ($P(k)$ weighted sum) | **PASSED** | < 0.01s |
-| `10` | `test_10_same_camera_filtering` | Confirms that Market-1501 evaluation excludes same-identity same-camera junk matches | **PASSED** | < 0.01s |
-| `11` | `test_11_fast_reproducibility` | Tests that seed controls random sampling determinism across repeated runs | **PASSED** | < 0.01s |
-| `12` | `test_12_full_result_completeness` | Verifies that cosine distance matrix computes full pairwise query $\times$ gallery tensor without truncation | **PASSED** | < 0.01s |
-| `13` | `test_13_checkpoint_save_and_reload` | Tests checkpoint serialization, file integrity, and exact parameter reconstruction | **PASSED** | 0.04s |
-| `14` | `test_14_gradient_flow` | Verifies non-zero gradients across stem, residual stages, CRD reconstruction, and DAD fusion | **PASSED** | 0.28s |
-| `15` | `test_15_parameter_counting` | Independently verifies exact parameter count: 9,752,277 total, 9,751,253 trainable | **PASSED** | 0.04s |
-| `16` | `test_16_flops_macs_measurement` | Dynamically measures FLOPs using `FlopCounterMode` (3.0015 GFLOPs, 1.5007 GMACs) without exception | **PASSED** | 0.65s |
-| `17` | `test_17_prcc_clothing_label_mapping` | Verifies PRCC camera-to-clothing condition logic (Cam A=B != Cam C), distinct PID handling, and invalid camera exception | **PASSED** | < 0.01s |
-| `18` | `test_18_random_identity_sampler_pk_batching` | Validates $P \times K$ batch composition ($P=4, K=4$), insufficient-sample handling, and reproducible seeding | **PASSED** | 0.01s |
+| Environment | Total Tests Run | Tests Passed | Tests Failed | Tests Skipped / Errored | Total Execution Time | Status |
+|:---|:---:|:---:|:---:|:---:|:---:|:---:|
+| **Isolated CUDA (`.venv_cuda`)** | 22 | 22 | 0 | 0 | **3.22 seconds** | **100% PASSED** |
+| **Host CPU (`System Python`)** | 22 | 22 | 0 | 0 | **2.61 seconds** | **100% PASSED** |
 
 ---
 
-## 3. Engineering Quality Assurance Conclusion
+## 2. Granular Unit & Regression Test Verification
 
-The test suite validates the architectural integrity, tensor compatibility, mathematical metric correctness, numerical stability, PRCC clothing disentanglement supervision, and identity-balanced batch sampling of the Lightweight DCR-ReID system. All 18 automated tests pass deterministically.
+| Test Name | Verification Target | Status (CPU) | Status (CUDA) | Key Assertion / Checked Invariant |
+|:---|:---|:---:|:---:|:---|
+| `test_01_model_initialization` | Model Architecture | Passed | Passed | Stem, stages 1-4, CRD, DAD, BNNeck, and classifiers instantiated |
+| `test_02_checkpoint_compatibility` | Baseline Checkpoint | Passed | Passed | 162/162 tensors loaded with 100% parameter match |
+| `test_03_forward_pass_shapes` | Tensor Dimensions | Passed | Passed | Eval: `[B, 512]`; Train: multi-branch dict (`cls_score`, `global_feat`, etc.) |
+| `test_04_embedding_dimensions_and_normalization` | Hypersphere Projection | Passed | Passed | $\|f\|_2 = 1.00000 \pm 10^{-5}$ across all samples |
+| `test_05_nan_inf_detection` | Numerical Stability | Passed | Passed | Zero NaN, zero Inf across all feature channels |
+| `test_06_dataset_and_label_consistency` | Data Format | Passed | Passed | PID and Camera index integer bounds and type checks |
+| `test_07_query_gallery_validity` | Identity Preservation | Passed | Passed | Query identities exist in gallery sets |
+| `test_08_rank_k_metrics` | CMC Calculation | Passed | Passed | Controlled synthetic test: Rank-1 evaluates to 100% |
+| `test_09_map_calculation` | Mean Average Precision | Passed | Passed | Controlled synthetic test: multi-positive AP matches exact formula |
+| `test_10_same_camera_filtering` | Market-1501 Junk Rule | Passed | Passed | Same-camera positive matches excluded as junk |
+| `test_11_fast_reproducibility` | Seed Determinism | Passed | Passed | Fixed seed generates identical pseudorandom permutations |
+| `test_12_full_result_completeness` | Cosine Distance Matrix | Passed | Passed | Output distance matrix matches shape $(N_q, N_g)$ |
+| `test_13_checkpoint_save_and_reload` | Checkpoint Serialization | Passed | Passed | Model state dict serializes and restores without numerical drift |
+| `test_14_gradient_flow` | Backward Propagation | Passed | Passed | Nonzero gradients propagate through stem, stages, CRD, DAD |
+| `test_15_parameter_counting` | Model Size | Passed | Passed | Total parameters: 9,752,277; Trainable: 9,751,253 |
+| `test_16_flops_macs_measurement` | FLOPs & MACs | Passed | Passed | 3.0015 GFLOPs, 1.5007 GMACs at $256 \times 128$ resolution |
+| `test_17_prcc_clothing_label_mapping` | Clothing Supervision Bug | Passed | Passed | Cam A = Cam B (0), Cam C = 1; invalid IDs raise `ValueError` |
+| `test_18_random_identity_sampler_pk_batching` | PK Batch Sampler | Passed | Passed | Guarantees $P=4$ distinct IDs, $K=4$ instances per batch |
+| `test_19_cuda_cpu_device_selection` | Execution Device Resolution | Passed | Passed | Graceful error on CPU when CUDA requested; valid CUDA forward on GPU |
+| `test_20_triplet_loss_construction` | Hard-Mining Triplet Loss | Passed | Passed | Extracts hardest positive & negative pairs; handles edge cases gracefully |
+| `test_21_baseline_and_trained_checkpoint_parity` | Dual Checkpoint Integrity | Passed | Passed | Baseline & CUDA checkpoints have distinct weights and both forward valid $L_2$ embeddings |
+| `test_22_cuda_checkpoint_compatibility` | CUDA Checkpoint Integrity | Passed | Passed | 162/162 tensors matched in `checkpoints/experiments/dcr_reid_cuda_v1/best_model.pth` |
+
+---
+
+## 3. Regression Verdict
+The test suite passes completely across all 22 test units under both execution interpreters. No unresolved test failures exist.

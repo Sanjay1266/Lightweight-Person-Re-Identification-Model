@@ -317,5 +317,100 @@ class TestDCRReID(unittest.TestCase):
         sampler2 = RandomIdentitySampler(synthetic_data, batch_size=16, num_instances=4, seed=123)
         self.assertEqual(list(sampler1), list(sampler2), "Samplers with same seed must yield identical batches")
 
+    def test_19_cuda_cpu_device_selection(self):
+        from evaluate import resolve_device
+        # CPU resolution
+        dev_cpu = resolve_device('cpu')
+        self.assertEqual(dev_cpu.type, 'cpu')
+
+        # Auto resolution
+        dev_auto = resolve_device('auto')
+        expected_auto = 'cuda' if torch.cuda.is_available() else 'cpu'
+        self.assertEqual(dev_auto.type, expected_auto)
+
+        # CUDA resolution
+        if not torch.cuda.is_available():
+            with self.assertRaises(RuntimeError):
+                resolve_device('cuda')
+        else:
+            dev_cuda = resolve_device('cuda')
+            self.assertEqual(dev_cuda.type, 'cuda')
+            # Verify CUDA execution in eval mode
+            model = LightweightDCRReID(num_classes=10, num_clothes=10, feat_dim=512).to(dev_cuda)
+            model.eval()
+            x = torch.randn(2, 3, 256, 128, device=dev_cuda)
+            out = model(x)
+            self.assertEqual(out.device.type, 'cuda')
+            self.assertEqual(out.shape, torch.Size([2, 512]))
+
+    def test_20_triplet_loss_construction(self):
+        from models.loss import TripletLoss
+        trip = TripletLoss(margin=0.3)
+        # Inputs: 4 samples with 2 identities: [0, 0, 1, 1]
+        pids = torch.tensor([0, 0, 1, 1])
+        # Construct embeddings where intra-class distance is 0.1 and inter-class distance is 1.0
+        # For identity 0: [1, 0, 0] and [0.99, 0.01, 0]
+        # For identity 1: [0, 1, 0] and [0, 0.99, 0.01]
+        feats = torch.tensor([
+            [1.0, 0.0, 0.0],
+            [0.9, 0.1, 0.0],
+            [0.0, 1.0, 0.0],
+            [0.0, 0.9, 0.1]
+        ], dtype=torch.float32)
+
+        loss = trip(feats, pids)
+        self.assertTrue(torch.isfinite(loss).item())
+        self.assertGreaterEqual(loss.item(), 0.0)
+
+        # Test with single-sample batch: handles gracefully without crashing
+        loss_single = trip(feats[:1], pids[:1])
+        self.assertTrue(torch.isfinite(loss_single).item())
+
+    def test_21_baseline_and_trained_checkpoint_parity(self):
+        ckpt_base = 'checkpoints/best_model.pth'
+        ckpt_opt = 'checkpoints/experiments/dcr_reid_cuda_v1/best_model.pth'
+
+        self.assertTrue(os.path.exists(ckpt_base), f"Baseline checkpoint missing: {ckpt_base}")
+        self.assertTrue(os.path.exists(ckpt_opt), f"CUDA optimized checkpoint missing: {ckpt_opt}")
+
+        sd_base = torch.load(ckpt_base, map_location='cpu', weights_only=False)
+        sd_opt = torch.load(ckpt_opt, map_location='cpu', weights_only=False)
+
+        # Distinct weights
+        base_weights = sd_base['stem.0.weight']
+        opt_weights = sd_opt['stem.0.weight']
+        self.assertFalse(torch.allclose(base_weights, opt_weights), "Baseline and trained weights must be distinct")
+
+        # Both models forward valid embeddings on identical test input
+        m_base = LightweightDCRReID(num_classes=sd_base['classifier.weight'].shape[0], num_clothes=100, feat_dim=512)
+        m_base.load_state_dict(sd_base, strict=False)
+        m_base.eval()
+
+        m_opt = LightweightDCRReID(num_classes=sd_opt['classifier.weight'].shape[0], num_clothes=100, feat_dim=512)
+        m_opt.load_state_dict(sd_opt, strict=False)
+        m_opt.eval()
+
+        dummy = torch.randn(4, 3, 256, 128)
+        with torch.no_grad():
+            f_base = m_base(dummy)
+            f_opt = m_opt(dummy)
+
+        self.assertEqual(f_base.shape, torch.Size([4, 512]))
+        self.assertEqual(f_opt.shape, torch.Size([4, 512]))
+        self.assertTrue(torch.allclose(torch.norm(f_base, p=2, dim=1), torch.ones(4), atol=1e-5))
+        self.assertTrue(torch.allclose(torch.norm(f_opt, p=2, dim=1), torch.ones(4), atol=1e-5))
+        self.assertFalse(torch.isnan(f_base).any().item())
+        self.assertFalse(torch.isnan(f_opt).any().item())
+
+    def test_22_cuda_checkpoint_compatibility(self):
+        ckpt_opt = 'checkpoints/experiments/dcr_reid_cuda_v1/best_model.pth'
+        sd = torch.load(ckpt_opt, map_location='cpu', weights_only=False)
+        num_classes = sd['classifier.weight'].shape[0]
+        num_clothes = sd['clothes_classifier.weight'].shape[0]
+        model = LightweightDCRReID(num_classes=num_classes, num_clothes=num_clothes, feat_dim=512)
+        model_dict = model.state_dict()
+        matched = {k: v for k, v in sd.items() if k in model_dict and v.shape == model_dict[k].shape}
+        self.assertEqual(len(matched), len(model_dict), f"Expected 162/162 tensors matched in CUDA checkpoint, got {len(matched)}/{len(model_dict)}")
+
 if __name__ == '__main__':
     unittest.main()
