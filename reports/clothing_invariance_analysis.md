@@ -77,3 +77,4 @@ We compared the retrieval accuracy across three inference representations:
 | **Branch 3 (`f_out` Ensemble)** | **30.08%** | **24.73%** | **7.36%** | **9.19%** | **Optimal synergy**: balances discriminative landmarks with clothing invariance |
 
 The ensemble branch (`f_out`) provides the best trade-off, retaining the sharp discrimination of DAD attention while suppressing clothing artifacts via the anatomical and contour decoders.
+
