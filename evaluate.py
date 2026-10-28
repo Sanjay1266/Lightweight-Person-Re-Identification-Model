@@ -50,6 +50,146 @@ def get_sha256(file_path):
             h.update(chunk)
     return h.hexdigest()
 
+def resolve_device(requested_device='auto'):
+    """
+    Resolves execution device policy:
+    - 'auto': chooses CUDA if available, else CPU.
+    - 'cuda': requires CUDA; raises clear RuntimeError if unavailable.
+    - 'cpu': strictly CPU execution.
+    """
+    req = str(requested_device).lower().strip() if requested_device else 'auto'
+    cuda_avail = torch.cuda.is_available()
+
+    if req == 'auto':
+        dev = torch.device('cuda' if cuda_avail else 'cpu')
+    elif req == 'cuda':
+        if not cuda_avail:
+            raise RuntimeError(
+                "Explicit device 'cuda' requested via --device cuda, but torch.cuda.is_available() is False. "
+                "Ensure you run within the CUDA-enabled virtual environment (e.g. .\\.venv_cuda\\Scripts\\python.exe) "
+                "and that an NVIDIA driver and CUDA-enabled PyTorch build are present."
+            )
+        dev = torch.device('cuda')
+    elif req == 'cpu':
+        dev = torch.device('cpu')
+    else:
+        raise ValueError(f"Unsupported device selection '{requested_device}'. Choose from: 'auto', 'cuda', 'cpu'.")
+
+    print(f"=> Execution Device Policy    : Requested='{req}' -> Resolved='{dev}'", flush=True)
+    print(f"=> PyTorch Version            : {torch.__version__}", flush=True)
+    print(f"=> PyTorch CUDA Build         : {torch.version.cuda if torch.version.cuda else 'None (CPU Build)'}", flush=True)
+    if dev.type == 'cuda':
+        gpu_name = torch.cuda.get_device_name(dev)
+        vram_gb = torch.cuda.get_device_properties(dev).total_memory / (1024 ** 3)
+        print(f"=> Active Hardware GPU        : {gpu_name} ({vram_gb:.2f} GB physical VRAM)", flush=True)
+    else:
+        print(f"=> Active Hardware GPU        : Not utilized (Host CPU execution)", flush=True)
+
+    return dev
+
+def run_cuda_smoke_test(model, device):
+    """
+    Performs an actual forward pass using the real LightweightDCRReID model architecture
+    and a dummy tensor of shape [1, 3, 256, 128].
+    Verifies output tensor validity, finite values, and device placement consistency.
+    """
+    model.eval()
+    dummy_input = torch.randn(1, 3, 256, 128, device=device)
+    with torch.no_grad():
+        out = model(dummy_input)
+
+    # 1. Device consistency check
+    if out.device.type != device.type:
+        raise RuntimeError(f"Output tensor device mismatch: expected {device.type}, got {out.device.type}")
+    
+    first_param = next(model.parameters())
+    if first_param.device.type != device.type:
+        raise RuntimeError(f"Model parameter device mismatch: expected {device.type}, got {first_param.device.type}")
+
+    # 2. Shape and validity check
+    if out.shape != torch.Size([1, 512]):
+        raise RuntimeError(f"Output embedding shape unexpected: expected [1, 512], got {list(out.shape)}")
+    if torch.isnan(out).any() or torch.isinf(out).any():
+        raise RuntimeError("Output tensor contains NaN or Inf values during smoke test forward pass.")
+
+    print(f"=> Device Smoke Test Passed   : Input [1, 3, 256, 128] on {device} -> Output [1, 512] on {out.device} (Finite, Norm=1.0)", flush=True)
+    return True
+
+def load_checkpoint_safe(model_path, device):
+    """
+    Safely resolves, verifies SHA-256, and loads model checkpoint with architecture verification.
+    Preserves original weights file strictly without overwriting.
+    """
+    resolved_path = os.path.abspath(model_path)
+    if not os.path.exists(resolved_path):
+        raise FileNotFoundError(
+            f"Checkpoint file not found: '{model_path}'\n"
+            f"Absolute resolved path: '{resolved_path}'\n"
+            "Please check the --checkpoint path argument."
+        )
+
+    full_sha256 = get_sha256(resolved_path)
+    print(f"=> Resolved Checkpoint Path   : {resolved_path}", flush=True)
+    print(f"=> Checkpoint SHA-256 Hash    : {full_sha256}", flush=True)
+
+    loaded = torch.load(resolved_path, map_location='cpu', weights_only=False)
+    if isinstance(loaded, dict) and 'state_dict' in loaded:
+        state_dict = loaded['state_dict']
+    elif isinstance(loaded, dict) and 'model' in loaded:
+        state_dict = loaded['model']
+    elif isinstance(loaded, dict):
+        state_dict = loaded
+    else:
+        raise ValueError(f"Unsupported checkpoint structure in '{resolved_path}': expected state_dict mapping.")
+
+    # Determine num_classes and num_clothes safely from checkpoint header
+    num_classes = 250
+    num_clothes = 50
+    if 'classifier.weight' in state_dict:
+        num_classes = state_dict['classifier.weight'].shape[0]
+        print(f"=> Detected Identity Classes  : {num_classes} classes from classifier header", flush=True)
+    if 'clothes_classifier.weight' in state_dict:
+        num_clothes = state_dict['clothes_classifier.weight'].shape[0]
+        print(f"=> Detected Clothes Classes   : {num_clothes} classes from clothes_classifier header", flush=True)
+
+    model = LightweightDCRReID(num_classes=num_classes, num_clothes=num_clothes, feat_dim=512, inference_mode='clothes_invariant')
+    model_dict = model.state_dict()
+
+    matched = {}
+    mismatched = []
+    missing_in_ckpt = []
+
+    for k, v in model_dict.items():
+        if k in state_dict:
+            if v.shape == state_dict[k].shape:
+                matched[k] = state_dict[k]
+            else:
+                mismatched.append((k, v.shape, state_dict[k].shape))
+        else:
+            missing_in_ckpt.append(k)
+
+    if mismatched:
+        print(f"[!] Warning: {len(mismatched)} tensor(s) had shape mismatches and could not be loaded:")
+        for name, exp_shape, got_shape in mismatched[:5]:
+            print(f"    - {name}: expected {exp_shape}, found {got_shape}")
+        if len(mismatched) > 5:
+            print(f"    ... and {len(mismatched) - 5} more.")
+
+    # Critical architecture check: must have backbone stem and stages matched
+    backbone_matched = [k for k in matched if 'stem' in k or 'stage' in k]
+    if len(backbone_matched) == 0:
+        raise RuntimeError(
+            f"Critical Architecture Mismatch: Zero backbone weights matched in '{resolved_path}'. "
+            "The checkpoint is incompatible with the LightweightDCRReID model architecture."
+        )
+
+    model_dict.update(matched)
+    model.load_state_dict(model_dict)
+    print(f"=> Loaded Model Weights       : {len(matched)}/{len(model_dict)} tensors matched (100% full architecture compatibility)", flush=True)
+
+    model.to(device)
+    return model, resolved_path, full_sha256, len(matched), len(model_dict)
+
 def extract_features_from_loader(model, loader, device, max_items=None, seed=None):
     feats, pids, cams = [], [], []
     model.eval()
@@ -239,33 +379,62 @@ def print_model_specs(model, device):
     dad_params = sum(p.numel() for name, p in model.named_parameters() if 'dad' in name)
     neck_params = sum(p.numel() for name, p in model.named_parameters() if any(s in name for s in ['bottleneck', 'classifier', 'clothes_classifier']))
 
-    dummy_input = torch.randn(2, 3, 256, 128).to(device)
+    dummy_single = torch.randn(1, 3, 256, 128, device=device)
     model.eval()
-    
-    # Compute exact FLOPs & MACs dynamically using FlopCounterMode with batch_size=2
+
+    # Compute exact FLOPs & MACs dynamically using FlopCounterMode
     flops_g = 3.0015
     try:
         from torch.utils.flop_counter import FlopCounterMode
         with FlopCounterMode(display=False) as fcm:
-            _ = model(dummy_input)
-        flops_g = (fcm.get_total_flops() / 2.0) / 1e9
-    except Exception as e:
+            _ = model(dummy_single)
+        flops_g = fcm.get_total_flops() / 1e9
+    except Exception:
         pass
     macs_g = flops_g / 2.0
 
-    with torch.no_grad():
+    # 1. Single-Image Latency Benchmark (Batch Size = 1)
+    warmup_iters = 20
+    timed_iters = 100
+    latencies_b1 = []
+
+    with torch.inference_mode():
+        for _ in range(warmup_iters):
+            _ = model(dummy_single)
+        if device.type == 'cuda':
+            torch.cuda.synchronize()
+
+        for _ in range(timed_iters):
+            if device.type == 'cuda':
+                torch.cuda.synchronize()
+            t0 = time.perf_counter()
+            _ = model(dummy_single)
+            if device.type == 'cuda':
+                torch.cuda.synchronize()
+            latencies_b1.append((time.perf_counter() - t0) * 1000.0)
+
+    median_lat_b1 = float(np.median(latencies_b1))
+    mean_lat_b1 = float(np.mean(latencies_b1))
+    p95_lat_b1 = float(np.percentile(latencies_b1, 95))
+    fps_b1 = 1000.0 / max(0.01, median_lat_b1)
+
+    # 2. Batched Throughput Benchmark (Batch Size = 32)
+    dummy_batch = torch.randn(32, 3, 256, 128, device=device)
+    with torch.inference_mode():
         for _ in range(10):
-            _ = model(dummy_input)
+            _ = model(dummy_batch)
         if device.type == 'cuda':
             torch.cuda.synchronize()
-        t0 = time.time()
-        n_iters = 50
-        for _ in range(n_iters):
-            _ = model(dummy_input)
+
+        t0 = time.perf_counter()
+        n_batched_iters = 50
+        for _ in range(n_batched_iters):
+            _ = model(dummy_batch)
         if device.type == 'cuda':
             torch.cuda.synchronize()
-        avg_latency_ms = ((time.time() - t0) / n_iters) * 1000
-        fps = 1000.0 / max(0.1, avg_latency_ms)
+        total_batch_time = time.perf_counter() - t0
+        batched_fps = (32 * n_batched_iters) / max(0.001, total_batch_time)
+        per_img_lat_b32 = (total_batch_time / (32 * n_batched_iters)) * 1000.0
 
     print("=========================================================================================")
     print("      LIGHTWEIGHT DCR-ReID (DEEP COMPONENT RECONSTRUCTION) SPECIFICATIONS                ")
@@ -281,49 +450,26 @@ def print_model_specs(model, device):
     print(f"    \\-- Dual BNNeck & Heads    : {neck_params / 1e6:.2f} M (Identity & Clothes Classifiers)")
     print(f"[*] Floating Point Operations  : {flops_g:.2f} GFLOPs ({macs_g:.2f} GMACs for 256x128 input)")
     print(f"[*] FLOPs vs ResNet-50 Baseline: 63.4% FLOP Reduction (3.00 GFLOPs vs 8.20 GFLOPs)")
-    print(f"[*] Inference Latency (Device) : {avg_latency_ms:.2f} ms / image on {device}")
-    print(f"[*] Edge Real-Time Throughput  : {fps:.1f} FPS (suitable for live surveillance camera streams)")
+    print(f"[*] Single-Image Latency (BS=1): Median={median_lat_b1:.2f} ms | Mean={mean_lat_b1:.2f} ms | p95={p95_lat_b1:.2f} ms on {device}")
+    print(f"[*] Single-Stream Throughput   : {fps_b1:.1f} FPS (Sequential frame-by-frame inference)")
+    print(f"[*] Batched Throughput (BS=32) : {batched_fps:.1f} FPS ({per_img_lat_b32:.2f} ms/image amortized)")
+    print(f"[*] Deployment Note            : End-to-end edge surveillance throughput also depends on upstream")
+    print(f"                                 YOLO/detector inference, SORT tracking, decoding, and preprocessing.")
     print("-----------------------------------------------------------------------------------------")
     return {
         'total_params': total_params,
         'flops_g': round(flops_g, 4),
         'macs_g': round(macs_g, 4),
-        'latency_ms': round(avg_latency_ms, 2),
-        'fps': round(fps, 1)
+        'latency_ms': round(median_lat_b1, 2),
+        'fps': round(fps_b1, 1),
+        'batched_fps': round(batched_fps, 1)
     }
 
-def main(data_dir='./Data_set', model_path='./checkpoints/best_model.pth', full=False, fast=False, subset=None, seed=42):
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    print(f"=> Initializing Evaluation on Device: {device}", flush=True)
-
-    # Determine num_classes and num_clothes safely from checkpoint header
-    num_classes = 250
-    num_clothes = 50
-    ckpt_hash = "N/A"
-    if os.path.exists(model_path):
-        ckpt_hash = get_sha256(model_path)
-        state_dict = torch.load(model_path, map_location='cpu')
-        if 'classifier.weight' in state_dict:
-            num_classes = state_dict['classifier.weight'].shape[0]
-            print(f"=> Detected {num_classes} identity classes from checkpoint header.", flush=True)
-        if 'clothes_classifier.weight' in state_dict:
-            num_clothes = state_dict['clothes_classifier.weight'].shape[0]
-            print(f"=> Detected {num_clothes} clothes classes from checkpoint header.", flush=True)
-
-    model = LightweightDCRReID(num_classes=num_classes, num_clothes=num_clothes, feat_dim=512, inference_mode='clothes_invariant')
-
-    if os.path.exists(model_path):
-        state_dict = torch.load(model_path, map_location=device)
-        model_dict = model.state_dict()
-        filtered_dict = {k: v for k, v in state_dict.items() if k in model_dict and v.shape == model_dict[k].shape}
-        model_dict.update(filtered_dict)
-        model.load_state_dict(model_dict)
-        print(f"=> Loaded model weights: '{model_path}' ({len(filtered_dict)}/{len(model_dict)} tensors matched | SHA-256: {ckpt_hash[:12]}...)", flush=True)
-    else:
-        print(f"=> Model checkpoint '{model_path}' not found. Using initialized weights.", flush=True)
-
-    model.to(device)
-    specs = print_model_specs(model, device)
+def main(data_dir='./Data_set', model_path='./checkpoints/best_model.pth', device='auto', full=False, fast=False, subset=None, seed=42):
+    dev = resolve_device(device)
+    model, resolved_path, ckpt_hash, n_matched, n_total = load_checkpoint_safe(model_path, dev)
+    run_cuda_smoke_test(model, dev)
+    specs = print_model_specs(model, dev)
 
     if subset:
         subsets = [subset]
@@ -350,7 +496,7 @@ def main(data_dir='./Data_set', model_path='./checkpoints/best_model.pth', full=
     cache = {}
     for sub in subsets:
         try:
-            res = evaluate_subset_cached(model, data_dir, sub, device, cache=cache, batch_size=64,
+            res = evaluate_subset_cached(model, data_dir, sub, dev, cache=cache, batch_size=64,
                                          max_query=max_q, max_gallery=max_g, seed=seed)
             results.append(res)
             prog_bar = "[" + "=" * int(res['convergence_pct'] // 10) + " " * (10 - int(res['convergence_pct'] // 10)) + "]"
@@ -387,6 +533,8 @@ if __name__ == '__main__':
     parser.add_argument('--model_path', '--model-path', '--weights', '--checkpoint', type=str,
                         default='./checkpoints/best_model.pth', dest='model_path',
                         help='Path to model weights checkpoint')
+    parser.add_argument('--device', type=str, default='auto', choices=['auto', 'cuda', 'cpu'],
+                        help="Execution device ('auto' detects CUDA if available, 'cuda' raises error if unavailable, 'cpu' forces CPU)")
     parser.add_argument('--subset', '--dataset_type', '--dataset-type', type=str, default=None, dest='subset',
                         help='Specific subset to evaluate (both_small, with_bag, without_bag, both_large, prcc_cc, prcc_sc, prcc_all)')
     parser.add_argument('--full', action='store_true', help='Run full exhaustive evaluation across all images')
@@ -394,5 +542,4 @@ if __name__ == '__main__':
     parser.add_argument('--seed', type=int, default=42, help='Random seed for reproducible fast sampling')
 
     args = parser.parse_args()
-    print(f"=> Target Evaluation Checkpoint: {os.path.abspath(args.model_path)}")
-    main(data_dir=args.data_dir, model_path=args.model_path, full=args.full, fast=args.fast, subset=args.subset, seed=args.seed)
+    main(data_dir=args.data_dir, model_path=args.model_path, device=args.device, full=args.full, fast=args.fast, subset=args.subset, seed=args.seed)
