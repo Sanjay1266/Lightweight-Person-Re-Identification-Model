@@ -156,7 +156,12 @@ class TestPaperDCRReID(unittest.TestCase):
         pid_to_clothes = {0: [0, 1], 1: [2, 3, 4]}
         loss = loss_fn(logits, pids, pid_to_clothes_map=pid_to_clothes)
         import math
-        self.assertAlmostEqual(loss.item(), math.log(10.0), places=3)
+        # Under Eq. 17 with uniform logits (prob=0.1):
+        # sample 0 (K=2): denom = 0.9, term = -log(0.1/0.9) = log(9)
+        # sample 1 (K=3): denom = 0.8, term = -log(0.1/0.8) = log(8)
+        # expected mean = (log(9) + log(8)) / 2
+        expected_val = (math.log(9.0) + math.log(8.0)) / 2.0
+        self.assertAlmostEqual(loss.item(), expected_val, places=3)
 
     def test_11_two_stage_loss_composition(self):
         """Verifies Stage 1 vs Stage 2 loss components in PaperDCRReIDCombinedLoss."""
