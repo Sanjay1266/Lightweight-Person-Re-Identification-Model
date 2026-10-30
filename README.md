@@ -168,9 +168,14 @@ Lightweight_Person_Re-Identification_Model/
 │   ├── visualization.py                    # 4-panel visualizer (Body, Clothes, Contour, DAD)
 │   └── reid_engine.py                      # Re-ID feature extraction engine
 ├── tests/
+│   ├── test_audit_fixes.py                 # Mathematical validation of Eq. 13-14, Eq. 17-18, DAD detach, 300 classes
 │   ├── test_paper_dcr.py                   # Track A: 12 automated unit tests (Architecture, Loss, Decoders, CUDA)
 │   └── test_dcr_reid.py                    # Track B: 22 automated unit and regression tests
 ├── reports/
+│   ├── DCR_REID_AUDIT_REPORT.md            # Comprehensive IEEE TCSVT 2023 paper compliance audit
+│   ├── FINAL_DCR_REID_TECHNICAL_REPORT.md  # Final bottleneck diagnosis and controlled optimization roadmap
+│   ├── evaluation_verification_report.md   # Independent benchmark verification of all checkpoints on RTX 4060
+│   ├── prcc_validation_summary.json        # Machine-readable PRCC dataset split and camera distribution audit
 │   ├── baseline/
 │   │   ├── baseline_metrics.json           # Baseline metrics snapshot
 │   │   └── baseline_summary.md             # Baseline reproduction verification
@@ -187,6 +192,8 @@ Lightweight_Person_Re-Identification_Model/
 │   ├── final_metrics.json                  # Machine-readable final benchmark metrics
 │   ├── experiment_comparison.csv           # Tabular comparison across all 7 subsets
 │   └── test_results.md                     # Regression test execution report
+├── scripts/
+│   └── validate_prcc_dataset.py            # Automated PRCC split, camera mapping, and zero-leakage validator
 ├── requirements_cuda.txt                   # Reproducible CUDA dependencies (PyTorch 2.5.1+cu124)
 ├── evaluate.py                             # Dual-track evaluation benchmark script (FAST / FULL / Auto-detect)
 ├── train_paper_dcr.py                      # Track A: Paper-Faithful training script (Two-stage optimization)
@@ -197,51 +204,125 @@ Lightweight_Person_Re-Identification_Model/
 
 ---
 
-## 🚀 Environment Setup & Reproduction Guide
+## 🚀 How to Run: Reproduction & Execution Guide
 
-### 1. Environment Installation
-For hardware GPU acceleration with PyTorch 2.5.1 and CUDA 12.4:
+### 1. Environment & GPU Verification
+Activate your dedicated CUDA environment and check that the NVIDIA GeForce RTX 4060 GPU is recognized:
 ```powershell
-# Create dedicated CUDA virtual environment
-python -m venv .venv_cuda
-.\.venv_cuda\Scripts\activate
-
-# Install CUDA-enabled PyTorch and dependencies
-pip install torch==2.5.1+cu124 torchvision==0.20.1+cu124 --extra-index-url https://download.pytorch.org/whl/cu124
-pip install numpy pillow
+.\.venv_cuda\Scripts\Activate.ps1
+.\.venv_cuda\Scripts\python.exe -c "import torch; print('CUDA Ready:', torch.cuda.is_available(), '| GPU:', torch.cuda.get_device_name(0))"
 ```
 
-### 2. Verify CUDA Acceptance
-Run the diagnostic script to verify GPU detection, tensor math, model forward/backward pass, and AMP:
+---
+
+### 2. Fast 1-Epoch Smoke Test (~3 Minutes)
+Run a quick 1-epoch dry run to verify the entire pipeline (ResNet-50 backbone, CRD decoders, DAD assembly, two-stage losses, and validation) end-to-end:
 ```powershell
-.\.venv_cuda\Scripts\python.exe verify_cuda.py
+.\.venv_cuda\Scripts\python.exe train_paper_dcr.py `
+    --epochs 1 `
+    --stage1-epochs 1 `
+    --batch-size 32 `
+    --num-instances 4 `
+    --num-classes 150 `
+    --num-clothes 300 `
+    --eval-freq 1 `
+    --device cuda
 ```
 
-### 3. Run Complete Automated Unit Test Suites (34 Tests)
-Run all 34 automated unit and regression tests across both tracks:
+---
+
+### 3. Full Training Runs (Track A Paper-Faithful DCR-ReID)
+
+#### Option A: Experiment A (Disentanglement & Clothing Label Bug Fixes)
+Trains with 300 unique clothing classes, exact Eq. (13–14) $\mathcal{L}_{ca}$, exact Eq. (17–18) $\mathcal{L}_{ac}$, and detached donor features:
 ```powershell
-.\.venv_cuda\Scripts\python.exe -m unittest tests/test_dcr_reid.py tests/test_paper_dcr.py
+.\.venv_cuda\Scripts\python.exe train_paper_dcr.py `
+    --data-dir ./Data_set `
+    --dataset-type prcc_cc `
+    --epochs 60 `
+    --stage1-epochs 10 `
+    --batch-size 32 `
+    --num-instances 4 `
+    --num-classes 150 `
+    --num-clothes 300 `
+    --lr 3.5e-4 `
+    --eval-freq 5 `
+    --device cuda `
+    --save-dir ./checkpoints/exp_a `
+    --log-dir ./reports/exp_a
 ```
 
-### 4. FAST Diagnostic Evaluation (Baseline Reproduction)
-Reproduce the baseline checkpoint evaluation on CPU or CUDA in under 3 seconds:
+#### Option B: Experiment B (Paper Batch Size 64 with P=8, K=8)
+Matches the paper's exact batch size 64 using **gradient accumulation** (`--accum-steps 2`), doubling intra-identity cross-clothing diversity while remaining comfortably within 8 GB VRAM:
 ```powershell
-.\.venv_cuda\Scripts\python.exe evaluate.py --fast --device auto
+.\.venv_cuda\Scripts\python.exe train_paper_dcr.py `
+    --data-dir ./Data_set `
+    --dataset-type prcc_cc `
+    --epochs 60 `
+    --stage1-epochs 10 `
+    --batch-size 32 `
+    --accum-steps 2 `
+    --num-instances 8 `
+    --num-classes 150 `
+    --num-clothes 300 `
+    --lr 3.5e-4 `
+    --eval-freq 5 `
+    --device cuda `
+    --save-dir ./checkpoints/exp_b `
+    --log-dir ./reports/exp_b
 ```
 
-### 5. FULL Parity Benchmark Across All 7 Subsets
-Run full exhaustive evaluation on CUDA:
+---
+
+### 4. Evaluating Model Checkpoints
+
+#### Full Exhaustive Evaluation (All 6,927 PRCC Images)
 ```powershell
-.\.venv_cuda\Scripts\python.exe evaluate.py --full --device cuda
+# Evaluate best paper checkpoint (Rank-1: 49.79%, mAP: 50.18%)
+.\.venv_cuda\Scripts\python.exe evaluate.py `
+    --checkpoint ./checkpoints/paper_dcr_best.pth `
+    --subset prcc_cc `
+    --device cuda `
+    --full
+
+# Evaluate baseline lightweight model
+.\.venv_cuda\Scripts\python.exe evaluate.py `
+    --checkpoint ./checkpoints/best_model.pth `
+    --subset prcc_cc `
+    --device cuda `
+    --full
 ```
 
-### 6. Train Track A (Paper-Faithful DCR-ReID)
-Train with ResNet-50 backbone, 384×192 input, CRD module, and two-stage loss optimization on PRCC:
+#### Fast Diagnostic Mode (~15 seconds)
 ```powershell
-.\.venv_cuda\Scripts\python.exe train_paper_dcr.py --epochs 60 --stage1-epochs 10 --batch-size 32 --device cuda
+.\.venv_cuda\Scripts\python.exe evaluate.py `
+    --checkpoint ./checkpoints/paper_dcr_best.pth `
+    --subset prcc_cc `
+    --device cuda `
+    --fast
 ```
 
-### 7. Train Track B (Lightweight DCR-ReID Edge Variant)
+---
+
+### 5. Running Validation & Automated Unit Test Suites
+
+#### Dataset & Camera Protocol Validation
+```powershell
+.\.venv_cuda\Scripts\python.exe scripts/validate_prcc_dataset.py ./Data_set
+```
+
+#### Complete Automated Test Suite (38 Tests)
+```powershell
+# 1. Mathematical audit bug fix tests (Loss formulations, DAD detach, 300 clothing classes)
+.\.venv_cuda\Scripts\python.exe tests/test_audit_fixes.py
+
+# 2. Run all regression tests across both tracks
+.\.venv_cuda\Scripts\python.exe -m unittest discover tests
+```
+
+---
+
+### 6. Train Track B (Lightweight DCR-ReID Edge Variant)
 Train lightweight CNN with identity-balanced PK sampling and dual BNNeck:
 ```powershell
 .\.venv_cuda\Scripts\python.exe train_cuda.py --dataset_type both_small --epochs 15 --batch_size 32 --use_pk_sampler --use_amp
