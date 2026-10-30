@@ -293,7 +293,7 @@ class RandomIdentitySampler:
         return self.length
 
 
-def generate_clothing_labels(pids, cams, is_prcc=True, num_clothes=100):
+def generate_clothing_labels(pids, cams, is_prcc=True, num_clothes=300):
     """
     Generates validated clothing condition labels.
     For PRCC:
@@ -315,7 +315,11 @@ def generate_clothing_labels(pids, cams, is_prcc=True, num_clothes=100):
 
         # Explicit mapping: 0 for Cam A (0) and B (1); 1 for Cam C (2)
         clothes_condition = (cams == 2).long()
-        clothes_labels = (pids * 2 + clothes_condition) % num_clothes
+        raw_labels = pids * 2 + clothes_condition
+        if num_clothes is not None and num_clothes < 300:
+            clothes_labels = raw_labels % num_clothes
+        else:
+            clothes_labels = raw_labels
     else:
         clothes_labels = (pids * 2 + (cams % 2)).long() % num_clothes
 
