@@ -1,0 +1,39 @@
+{
+  "dataset": "PRCC",
+  "train": {
+    "num_identities": 150,
+    "num_images": 17896,
+    "cams": {
+      "A": 5952,
+      "B": 5317,
+      "C": 6627
+    },
+    "pid_min": 92,
+    "pid_max": 332
+  },
+  "test": {
+    "query_cam_A": {
+      "identities": 71,
+      "images": 3384
+    },
+    "gallery_sc_cam_B": {
+      "identities": 71,
+      "images": 3873
+    },
+    "gallery_cc_cam_C": {
+      "identities": 71,
+      "images": 3543
+    }
+  },
+  "leakage": {
+    "has_leakage": false,
+    "overlapping_identities": []
+  },
+  "clothing_classes": {
+    "identities": 150,
+    "true_required_clothes_classes": 300,
+    "configured_clothes_classes_in_code": 100,
+    "aliasing_detected": true,
+    "aliasing_factor": "3.00x"
+  }
+}
