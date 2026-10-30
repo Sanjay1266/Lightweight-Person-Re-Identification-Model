@@ -94,33 +94,40 @@ class ClothesAdversarialLoss(nn.Module):
             pid_i = pids[i].item()
 
             if pid_to_clothes_map is not None and pid_i in pid_to_clothes_map:
-                intra_clothes = pid_to_clothes_map[pid_i]
+                intra_clothes = list(pid_to_clothes_map[pid_i])
             else:
                 # Default PRCC condition: exactly 2 clothing classes per identity
                 # (c_same = pid*2, c_diff = pid*2 + 1)
-                c_base = (ci // 2) * 2
+                c_base = pid_i * 2
                 intra_clothes = [c_base, c_base + 1]
 
             K = max(1, len(intra_clothes))
 
-            for c in intra_clothes:
-                if c < self.num_clothes:
-                    if c == ci:
-                        q_targets[i, c] = 1.0 - self.epsilon + (self.epsilon / K)
-                    else:
-                        q_targets[i, c] = self.epsilon / K
-
-            # Denominator: u(x_i, c) + sum_{id(j) != id(i)} u(x_i, j)
-            # which equals 1.0 - sum_{c' in intra, c' != c} u(x_i, c')
+            # Identify valid intra clothes indices within num_clothes
+            valid_intra = [c for c in intra_clothes if c < self.num_clothes]
             intra_mask = torch.zeros(self.num_clothes, dtype=torch.bool, device=clothes_logits.device)
-            for c in intra_clothes:
-                if c < self.num_clothes:
-                    intra_mask[c] = True
+            for c in valid_intra:
+                intra_mask[c] = True
 
-            sum_other_intra = probs[i][intra_mask].sum() - probs[i, ci]
-            denom = torch.clamp(probs[i, ci] + (1.0 - probs[i][intra_mask].sum()), min=1e-8)
-            log_prob = torch.log(torch.clamp(probs[i, ci] / denom, min=1e-8, max=1.0))
-            losses.append(-log_prob)
+            # Total probability mass on intra-identity clothes
+            sum_intra = probs[i][intra_mask].sum()
+
+            # Paper Eq. 13 & 14:
+            # L_ca = - sum_{c=1}^{N_c} q(c) * log( u(x_i, c) / (u(x_i, c) + sum_{id(j) != id(i)} u(x_i, j)) )
+            # Denominator: u(x_i, c) + (1.0 - sum_intra)
+            sample_loss = torch.tensor(0.0, device=clothes_logits.device)
+            for c in valid_intra:
+                if c == ci:
+                    qc = 1.0 - self.epsilon + (self.epsilon / K)
+                else:
+                    qc = self.epsilon / K
+
+                u_c = probs[i, c]
+                denom = torch.clamp(u_c + (1.0 - sum_intra), min=1e-8)
+                term = torch.log(torch.clamp(u_c / denom, min=1e-8, max=1.0))
+                sample_loss = sample_loss - (qc * term)
+
+            losses.append(sample_loss)
 
         if losses:
             return torch.stack(losses).mean()
@@ -133,6 +140,7 @@ class AssembledClothesLoss(nn.Module):
     Supervises assembled feature G_i to predict fine-grained clothes belonging to id(i)
     and suppresses clothes categories belonging to other identities:
     h(c) = 1/K for id(c) == id(i), 0 otherwise.
+    Denominator: C_P(G_i | c) + sum_{id(j) != id(i)} C_P(G_i | j)
     """
     def __init__(self, num_clothes):
         super(AssembledClothesLoss, self).__init__()
@@ -149,19 +157,28 @@ class AssembledClothesLoss(nn.Module):
         for i in range(batch_size):
             pid_i = pids[i].item()
             if pid_to_clothes_map is not None and pid_i in pid_to_clothes_map:
-                intra_clothes = pid_to_clothes_map[pid_i]
+                intra_clothes = list(pid_to_clothes_map[pid_i])
             else:
-                c_base = (pid_i * 2) % self.num_clothes
-                intra_clothes = [c_base, (c_base + 1) % self.num_clothes]
+                c_base = pid_i * 2
+                intra_clothes = [c_base, c_base + 1]
 
             K = max(1, len(intra_clothes))
-            intra_loss = torch.tensor(0.0, device=assembled_clothes_logits.device)
-            for c in intra_clothes:
-                if c < self.num_clothes:
-                    p_c = torch.clamp(probs[i, c], min=1e-8, max=1.0)
-                    intra_loss = intra_loss - (1.0 / K) * torch.log(p_c)
+            valid_intra = [c for c in intra_clothes if c < self.num_clothes]
+            intra_mask = torch.zeros(self.num_clothes, dtype=torch.bool, device=assembled_clothes_logits.device)
+            for c in valid_intra:
+                intra_mask[c] = True
 
-            losses.append(intra_loss)
+            sum_intra = probs[i][intra_mask].sum()
+            sample_loss = torch.tensor(0.0, device=assembled_clothes_logits.device)
+
+            for c in valid_intra:
+                hc = 1.0 / K
+                u_c = probs[i, c]
+                denom = torch.clamp(u_c + (1.0 - sum_intra), min=1e-8)
+                term = torch.log(torch.clamp(u_c / denom, min=1e-8, max=1.0))
+                sample_loss = sample_loss - (hc * term)
+
+            losses.append(sample_loss)
 
         return torch.stack(losses).mean()
 
