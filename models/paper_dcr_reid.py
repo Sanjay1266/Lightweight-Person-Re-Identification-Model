@@ -117,7 +117,7 @@ class PaperDCRReID(nn.Module):
     Feature Map Channels: P_i^+ (1024), P_i^- (512), P_i^t (1024) -> Total 2560.
     Inference Feature: F_i^+ ⊕ F_i^t (4096 dimensions, L2 normalized).
     """
-    def __init__(self, num_classes=150, num_clothes=100, pretrained=True, num_identities=None):
+    def __init__(self, num_classes=150, num_clothes=300, pretrained=True, num_identities=None):
         super(PaperDCRReID, self).__init__()
         if num_identities is not None:
             num_classes = num_identities
@@ -188,7 +188,7 @@ class PaperDCRReID(nn.Module):
         h = self.layer4(h)
         return h
 
-    def forward(self, x, shuffle_clothes=False):
+    def forward(self, x, pids=None, shuffle_clothes=False):
         # 1. Feature Extraction through ResNet-50
         feat_2048 = self.extract_backbone_features(x)
 
@@ -223,8 +223,23 @@ class PaperDCRReID(nn.Module):
 
         # DAD Feature Assembly: G_i = F_i^+ ⊕ F_ai^- ⊕ F_i^t (Eq. 16)
         if shuffle_clothes and f_minus.size(0) > 1:
-            perm = torch.randperm(f_minus.size(0), device=x.device)
-            f_minus_shuffled = f_minus[perm]
+            bs = f_minus.size(0)
+            if pids is not None:
+                # Sample donor instance with different identity (id(ai) != id(i))
+                perm = torch.empty(bs, dtype=torch.long, device=x.device)
+                for i in range(bs):
+                    diff_mask = (pids != pids[i]).nonzero(as_tuple=True)[0]
+                    if len(diff_mask) > 0:
+                        rand_idx = torch.randint(len(diff_mask), (1,), device=x.device).item()
+                        perm[i] = diff_mask[rand_idx]
+                    else:
+                        perm[i] = (i + 1) % bs
+            else:
+                # Cyclic roll ensures perm[i] != i
+                perm = torch.roll(torch.arange(bs, device=x.device), shifts=1)
+
+            # Detach donor clothes features to prevent cross-identity gradient leakage into donor branch
+            f_minus_shuffled = f_minus[perm].detach()
         else:
             f_minus_shuffled = f_minus
 
