@@ -150,7 +150,9 @@ def train_paper_dcr(
     img_height=384,
     img_width=192,
     num_classes=150,
-    num_clothes=100,
+    num_clothes=300,
+    num_instances=4,
+    accum_steps=1,
     save_dir='./checkpoints',
     log_dir='./reports',
     eval_freq=5,
@@ -187,7 +189,7 @@ def train_paper_dcr(
         batch_size=batch_size,
         num_workers=0,
         use_pk_sampler=True,
-        num_instances=4,
+        num_instances=num_instances,
         height=img_height,
         width=img_width
     )
@@ -198,7 +200,7 @@ def train_paper_dcr(
     pid_to_clothes_map = {}
     for _, pid, cam in dataset.train_samples:
         cond = 1 if cam == 2 else 0
-        cid = (pid * 2 + cond) % num_clothes
+        cid = (pid * 2 + cond) if num_clothes >= 300 else ((pid * 2 + cond) % num_clothes)
         if pid not in pid_to_clothes_map:
             pid_to_clothes_map[pid] = set()
         pid_to_clothes_map[pid].add(cid)
@@ -258,7 +260,8 @@ def train_paper_dcr(
         running_id_prime = 0.0
         running_r = 0.0
 
-        for imgs, pids, cams, _ in train_loader:
+        optimizer.zero_grad()
+        for batch_idx, (imgs, pids, cams, _) in enumerate(train_loader):
             imgs = imgs.to(device, non_blocking=True)
             pids = pids.to(device, non_blocking=True)
             cams = cams.to(device, non_blocking=True)
@@ -266,10 +269,8 @@ def train_paper_dcr(
             clothes_labels = generate_clothing_labels(pids, cams, is_prcc=dataset.is_prcc, num_clothes=num_clothes).to(device)
             target_plus, target_minus, target_contour = generate_paper_component_masks(imgs)
 
-            optimizer.zero_grad()
-
             with torch.amp.autocast('cuda', enabled=(device.type == 'cuda')):
-                outputs = model(imgs, shuffle_clothes=(stage == 2))
+                outputs = model(imgs, pids=pids, shuffle_clothes=(stage == 2))
                 loss_dict = loss_fn(
                     outputs, pids, clothes_labels,
                     target_plus=target_plus,
@@ -279,19 +280,25 @@ def train_paper_dcr(
                     stage=stage
                 )
                 loss = loss_dict['total_loss']
+                if accum_steps > 1:
+                    loss = loss / accum_steps
 
             if device.type == 'cuda':
                 scaler.scale(loss).backward()
-                scaler.unscale_(optimizer)
-                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0)
-                scaler.step(optimizer)
-                scaler.update()
+                if (batch_idx + 1) % accum_steps == 0 or (batch_idx + 1) == len(train_loader):
+                    scaler.unscale_(optimizer)
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0)
+                    scaler.step(optimizer)
+                    scaler.update()
+                    optimizer.zero_grad()
             else:
                 loss.backward()
-                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0)
-                optimizer.step()
+                if (batch_idx + 1) % accum_steps == 0 or (batch_idx + 1) == len(train_loader):
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0)
+                    optimizer.step()
+                    optimizer.zero_grad()
 
-            running_loss += loss.item()
+            running_loss += loss_dict['total_loss'].item()
             running_id += loss_dict['l_id'].item()
             running_c += loss_dict['l_c'].item()
             running_ca += loss_dict['l_ca'].item()
@@ -406,7 +413,9 @@ if __name__ == '__main__':
     parser.add_argument('--img-height', '--img_height', type=int, default=384, dest='img_height')
     parser.add_argument('--img-width', '--img_width', type=int, default=192, dest='img_width')
     parser.add_argument('--num-classes', '--num_classes', type=int, default=150, dest='num_classes')
-    parser.add_argument('--num-clothes', '--num_clothes', type=int, default=100, dest='num_clothes')
+    parser.add_argument('--num-clothes', '--num_clothes', type=int, default=300, dest='num_clothes')
+    parser.add_argument('--num-instances', '--num_instances', type=int, default=4, dest='num_instances')
+    parser.add_argument('--accum-steps', '--accum_steps', type=int, default=1, dest='accum_steps')
     parser.add_argument('--save-dir', '--save_dir', type=str, default='./checkpoints', dest='save_dir')
     parser.add_argument('--log-dir', '--log_dir', type=str, default='./reports', dest='log_dir')
     parser.add_argument('--eval-freq', '--eval_freq', type=int, default=5, dest='eval_freq')
@@ -428,9 +437,12 @@ if __name__ == '__main__':
         img_width=args.img_width,
         num_classes=args.num_classes,
         num_clothes=args.num_clothes,
+        num_instances=args.num_instances,
+        accum_steps=args.accum_steps,
         save_dir=args.save_dir,
         log_dir=args.log_dir,
         eval_freq=args.eval_freq,
         device_name=args.device,
         seed=args.seed
     )
+
